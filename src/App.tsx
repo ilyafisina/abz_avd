@@ -15,6 +15,8 @@ import { ReportsPage } from './pages/ReportsPage';
 import { UsersPage } from './pages/UsersPage';
 import { LogsPage } from './pages/LogsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { HelpPage } from './pages/HelpPage';
 import './App.css';
 
 const DashboardRouter = () => {
@@ -44,6 +46,8 @@ const DashboardRouter = () => {
         <Route path="/users" element={<UsersPage />} />
         <Route path="/logs" element={<LogsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/help" element={<HelpPage />} />
         <Route path="/profile" element={<div>Страница профиля (в разработке)</div>} />
         <Route path="/help" element={<div>Страница помощи (в разработке)</div>} />
         <Route path="*" element={<Navigate to="/dashboard" />} />
