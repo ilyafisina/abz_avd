@@ -1,0 +1,419 @@
+/* Warehouseman Dashboard Styles */
+.warehouseman-dashboard {
+  padding: 0;
+  background-color: #f5f7fa;
+  min-height: 100%;
+  width: 100%;
+}
+
+.tab-content {
+  width: 100%;
+  padding: 20px;
+}
+
+.dashboard h1 {
+  color: #2c3e50;
+  margin: 0 0 4px 0;
+  font-size: 28px;
+}
+
+.dashboard .subtitle {
+  color: #7f8c8d;
+  margin: 0 0 20px 0;
+  font-size: 13px;
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+  overflow-x: auto;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7f8c8d;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: #2c3e50;
+}
+
+.tab-btn.active {
+  color: #3498db;
+  border-bottom-color: #3498db;
+}
+
+.section {
+  background: white;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section h2 {
+  color: #2c3e50;
+  font-size: 18px;
+  margin: 0;
+}
+
+.low-stock-badge {
+  background-color: #ecf0f1;
+  color: #7f8c8d;
+  padding: 6px 12px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.low-stock-badge.alert {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.product-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  background: white;
+  transition: all 0.3s ease;
+}
+
+.product-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.product-card.low-stock {
+  border-left: 4px solid #f39c12;
+  background-color: #fffaf0;
+}
+
+.product-header {
+  margin-bottom: 10px;
+}
+
+.product-header h3 {
+  margin: 0 0 4px 0;
+  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sku {
+  color: #95a5a6;
+  font-size: 11px;
+}
+
+.product-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.detail-row .label {
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.detail-row .value {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.detail-row .quantity {
+  font-size: 13px;
+  font-weight: 700;
+  color: #27ae60;
+}
+
+.detail-row .location {
+  background-color: #ecf0f1;
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-family: monospace;
+  font-size: 10px;
+}
+
+.detail-row .price {
+  color: #e74c3c;
+  font-weight: 700;
+}
+
+.warning {
+  background-color: #fef5e7;
+  color: #f39c12;
+  padding: 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.requests-table {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.requests-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.requests-table thead {
+  background-color: #ecf0f1;
+}
+
+.requests-table th {
+  padding: 10px;
+  text-align: left;
+  color: #2c3e50;
+  font-weight: 600;
+  border-bottom: 2px solid #bdc3c7;
+  white-space: nowrap;
+}
+
+.requests-table td {
+  padding: 10px;
+  border-bottom: 1px solid #ecf0f1;
+  color: #2c3e50;
+}
+
+.requests-table tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+.request-number {
+  font-weight: 600;
+  color: #3498db;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.status {
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-approved {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-rejected {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-completed {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.priority {
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.priority-low {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.priority-normal {
+  background-color: #f3e5f5;
+  color: #6a1b9a;
+}
+
+.priority-high {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 30px;
+  color: #7f8c8d;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.loading {
+  text-align: center;
+  padding: 30px;
+  color: #3498db;
+  font-weight: 600;
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .tab-content {
+    padding: 16px;
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
+/* Mobile Tablet */
+@media (max-width: 768px) {
+  .tab-content {
+    padding: 12px;
+  }
+
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard h1 {
+    font-size: 22px;
+  }
+
+  .requests-table {
+    font-size: 11px;
+  }
+
+  .requests-table th,
+  .requests-table td {
+    padding: 8px;
+  }
+
+  .status,
+  .priority {
+    padding: 2px 4px;
+    font-size: 9px;
+  }
+}
+
+/* Mobile Portrait */
+@media (max-width: 640px) {
+  .tab-content {
+    padding: 10px;
+  }
+
+  .products-grid {
+    gap: 12px;
+  }
+
+  .product-card {
+    padding: 10px;
+  }
+
+  .dashboard h1 {
+    font-size: 20px;
+  }
+
+  .tab-btn {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+
+  .section {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .detail-row {
+    font-size: 11px;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+  .tab-content {
+    padding: 8px;
+  }
+
+  .dashboard h1 {
+    font-size: 18px;
+    margin-bottom: 2px;
+  }
+
+  .dashboard .subtitle {
+    margin-bottom: 12px;
+  }
+
+  .products-grid {
+    gap: 10px;
+  }
+
+  .product-card {
+    padding: 8px;
+  }
+
+  .product-header h3 {
+    font-size: 12px;
+  }
+
+  .detail-row {
+    font-size: 10px;
+  }
+
+  .requests-table th,
+  .requests-table td {
+    padding: 6px;
+    font-size: 10px;
+  }
+
+  .status,
+  .priority {
+    padding: 1px 3px;
+    font-size: 8px;
+  }
+
+  .section {
+    padding: 10px;
+  }
+}
