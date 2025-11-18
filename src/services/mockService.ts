@@ -372,3 +372,11 @@ export const loggingService = {
     return mockSystemLogs.filter(log => log.entityType === entityType && log.entityId === entityId);
   },
 };
+
+// Экспортируем как systemLogService для совместимости
+export const systemLogService = {
+  async getLogs(): Promise<SystemLog[]> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return mockSystemLogs;
+  },
+};

@@ -11,6 +11,10 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ProductsPage } from './pages/ProductsPage';
 import { RequestsPage } from './pages/RequestsPage';
 import { LocationsPage } from './pages/LocationsPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { UsersPage } from './pages/UsersPage';
+import { LogsPage } from './pages/LogsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import './App.css';
 
 const DashboardRouter = () => {
@@ -36,10 +40,10 @@ const DashboardRouter = () => {
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/locations" element={<LocationsPage />} />
-        <Route path="/reports" element={<div>Страница отчётов (в разработке)</div>} />
-        <Route path="/users" element={<div>Страница пользователей (в разработке)</div>} />
-        <Route path="/logs" element={<div>Страница логов (в разработке)</div>} />
-        <Route path="/settings" element={<div>Страница настроек (в разработке)</div>} />
+        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/users" element={<UsersPage />} />
+        <Route path="/logs" element={<LogsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/profile" element={<div>Страница профиля (в разработке)</div>} />
         <Route path="/help" element={<div>Страница помощи (в разработке)</div>} />
         <Route path="*" element={<Navigate to="/dashboard" />} />
