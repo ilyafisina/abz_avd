@@ -48,8 +48,6 @@ const DashboardRouter = () => {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/help" element={<HelpPage />} />
-        <Route path="/profile" element={<div>Страница профиля (в разработке)</div>} />
-        <Route path="/help" element={<div>Страница помощи (в разработке)</div>} />
         <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
     </Layout>
