@@ -8,6 +8,9 @@ import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { WarehousemanDashboard } from './components/warehouseman/WarehousemanDashboard';
 import { ManagerDashboard } from './components/manager/ManagerDashboard';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { ProductsPage } from './pages/ProductsPage';
+import { RequestsPage } from './pages/RequestsPage';
+import { LocationsPage } from './pages/LocationsPage';
 import './App.css';
 
 const DashboardRouter = () => {
@@ -30,9 +33,9 @@ const DashboardRouter = () => {
             )
           }
         />
-        <Route path="/products" element={<div>Страница товаров (в разработке)</div>} />
-        <Route path="/requests" element={<div>Страница заявок (в разработке)</div>} />
-        <Route path="/locations" element={<div>Страница местоположений (в разработке)</div>} />
+        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/requests" element={<RequestsPage />} />
+        <Route path="/locations" element={<LocationsPage />} />
         <Route path="/reports" element={<div>Страница отчётов (в разработке)</div>} />
         <Route path="/users" element={<div>Страница пользователей (в разработке)</div>} />
         <Route path="/logs" element={<div>Страница логов (в разработке)</div>} />
