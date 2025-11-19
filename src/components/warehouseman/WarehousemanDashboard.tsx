@@ -29,8 +29,28 @@ export const WarehousemanDashboard: React.FC = () => {
 
   return (
     <div className="dashboard warehouseman-dashboard">
-      <h1>Панель Складовщика</h1>
+      <h1>📦 Панель Складовщика</h1>
       <p className="subtitle">Управление товаром и просмотр заявок</p>
+
+      {/* Dashboard Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>📦 Всего товаров</p>
+          <p style={{ margin: '0', color: '#2c3e50', fontSize: '28px', fontWeight: 'bold' }}>{products.length}</p>
+        </div>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>⚠️ Низкие запасы</p>
+          <p style={{ margin: '0', color: '#e74c3c', fontSize: '28px', fontWeight: 'bold' }}>{products.filter(p => p.quantity <= p.minQuantity).length}</p>
+        </div>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>📋 Активные заявки</p>
+          <p style={{ margin: '0', color: '#3498db', fontSize: '28px', fontWeight: 'bold' }}>{requests.filter(r => r.status === 'pending').length}</p>
+        </div>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>💰 Общая стоимость</p>
+          <p style={{ margin: '0', color: '#27ae60', fontSize: '24px', fontWeight: 'bold' }}>₽{(products.reduce((sum, p) => sum + (p.quantity * p.price), 0) / 1000).toFixed(1)}k</p>
+        </div>
+      </div>
 
       <div className="dashboard-tabs">
         <button

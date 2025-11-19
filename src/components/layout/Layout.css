@@ -311,6 +311,54 @@
   }
 }
 
+/* Extra Mobile Optimization */
+@media (max-width: 380px) {
+  .navbar-container {
+    height: 48px;
+    padding: 0 4px;
+  }
+
+  .navbar-brand h2 {
+    font-size: 12px;
+  }
+
+  .user-info {
+    display: none;
+  }
+
+  .btn-logout {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .sidebar {
+    width: 250px;
+  }
+
+  .main-content {
+    min-height: calc(100vh - 48px);
+    padding: 8px 4px;
+  }
+
+  .nav-link {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .nav-section h3 {
+    font-size: 8px;
+    padding: 0 10px;
+  }
+
+  .sidebar-footer {
+    padding: 8px 10px;
+  }
+
+  .version {
+    font-size: 8px;
+  }
+}
+
 /* Scrollbar styling */
 .sidebar::-webkit-scrollbar {
   width: 6px;

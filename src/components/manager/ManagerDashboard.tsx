@@ -34,8 +34,32 @@ export const ManagerDashboard: React.FC = () => {
 
   return (
     <div className="dashboard manager-dashboard">
-      <h1>Панель Менеджера</h1>
+      <h1>👔 Панель Менеджера</h1>
       <p className="subtitle">Управление заявками и мониторинг запасов</p>
+
+      {/* Dashboard Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>📦 Товары на складе</p>
+          <p style={{ margin: '0', color: '#2c3e50', fontSize: '28px', fontWeight: 'bold' }}>{totalProducts}</p>
+          <p style={{ margin: '8px 0 0 0', color: '#7f8c8d', fontSize: '11px' }}>Всего стоимость: ₽{(totalValue / 1000).toFixed(1)}k</p>
+        </div>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>📋 В ожидании</p>
+          <p style={{ margin: '0', color: '#f39c12', fontSize: '28px', fontWeight: 'bold' }}>{activeRequests}</p>
+          <p style={{ margin: '8px 0 0 0', color: '#7f8c8d', fontSize: '11px' }}>Активные заявки</p>
+        </div>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>✓ Одобрено</p>
+          <p style={{ margin: '0', color: '#27ae60', fontSize: '28px', fontWeight: 'bold' }}>{requests.filter(r => r.status === 'approved').length}</p>
+          <p style={{ margin: '8px 0 0 0', color: '#7f8c8d', fontSize: '11px' }}>Одобренные заявки</p>
+        </div>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>⚠️ Критический</p>
+          <p style={{ margin: '0', color: '#e74c3c', fontSize: '28px', fontWeight: 'bold' }}>{products.filter(p => p.quantity <= p.minQuantity).length}</p>
+          <p style={{ margin: '8px 0 0 0', color: '#7f8c8d', fontSize: '11px' }}>Низкие запасы</p>
+        </div>
+      </div>
 
       <div className="dashboard-tabs">
         <button

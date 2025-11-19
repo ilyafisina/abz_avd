@@ -405,3 +405,45 @@
     padding: 5px;
   }
 }
+
+/* Extra mobile optimization */
+@media (max-width: 400px) {
+  .manager-dashboard {
+    padding: 0;
+  }
+
+  .dashboard h1 {
+    font-size: 18px;
+    padding: 12px 12px 4px;
+  }
+
+  .dashboard .subtitle {
+    font-size: 11px;
+    padding: 0 12px 12px;
+  }
+
+  .dashboard-tabs {
+    padding: 0 12px;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .tab-btn {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .tab-content {
+    padding: 12px;
+  }
+
+  .requests-table th,
+  .requests-table td {
+    padding: 4px;
+    font-size: 10px;
+  }
+
+  .stat-card {
+    padding: 10px;
+  }
+}

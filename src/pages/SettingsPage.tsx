@@ -40,40 +40,40 @@ export const SettingsPage = () => {
         <p>Конфигурация и параметры приложения</p>
       </div>
 
-      <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-        <div style={{ flex: '0 0 200px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[
-              { id: 'general', label: '🔧 Общие' },
-              { id: 'warehouse', label: '📦 Склад' },
-              { id: 'notifications', label: '🔔 Уведомления' },
-              { id: 'appearance', label: '🎨 Внешний вид' },
-              { id: 'backup', label: '💾 Резервные копии' },
-              { id: 'api', label: '🔌 API' },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '12px',
-                  border: activeTab === tab.id ? '2px solid #1976d2' : '1px solid #ddd',
-                  borderRadius: '4px',
-                  backgroundColor: activeTab === tab.id ? '#e3f2fd' : '#fff',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontWeight: activeTab === tab.id ? '600' : '400',
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '20px', marginBottom: '20px', gridTemplateRows: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[
+            { id: 'general', label: '🔧 Общие' },
+            { id: 'warehouse', label: '📦 Склад' },
+            { id: 'notifications', label: '🔔 Уведомления' },
+            { id: 'appearance', label: '🎨 Внешний вид' },
+            { id: 'backup', label: '💾 Резервные копии' },
+            { id: 'api', label: '🔌 API' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px',
+                border: activeTab === tab.id ? '2px solid #1976d2' : '1px solid #ddd',
+                borderRadius: '4px',
+                backgroundColor: activeTab === tab.id ? '#e3f2fd' : '#fff',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontWeight: activeTab === tab.id ? '600' : '400',
+                color: '#333',
+                minWidth: '160px',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div style={{ flex: 1, backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #eee', color: '#333' }}>
           {activeTab === 'general' && (
             <div>
-              <h2>🔧 Общие настройки</h2>
+              <h2 style={{ color: '#333', marginTop: 0 }}>🔧 Общие настройки</h2>
               <div className="form-group" style={{ marginTop: '16px' }}>
                 <label>Название склада</label>
                 <input
@@ -133,7 +133,7 @@ export const SettingsPage = () => {
 
           {activeTab === 'warehouse' && (
             <div>
-              <h2>📦 Настройки склада</h2>
+              <h2 style={{ color: '#333', marginTop: 0 }}>📦 Настройки склада</h2>
               <div className="form-group" style={{ marginTop: '16px' }}>
                 <label>
                   <input
@@ -164,7 +164,7 @@ export const SettingsPage = () => {
 
           {activeTab === 'notifications' && (
             <div>
-              <h2>🔔 Уведомления</h2>
+              <h2 style={{ color: '#333', marginTop: 0 }}>🔔 Уведомления</h2>
               <div className="form-group" style={{ marginTop: '16px' }}>
                 <label>
                   <input
@@ -195,7 +195,7 @@ export const SettingsPage = () => {
 
           {activeTab === 'appearance' && (
             <div>
-              <h2>🎨 Внешний вид</h2>
+              <h2 style={{ color: '#333', marginTop: 0 }}>🎨 Внешний вид</h2>
               <div className="form-group" style={{ marginTop: '16px' }}>
                 <label>Тема оформления</label>
                 <select value={settings.theme} onChange={(e) => handleChange('theme', e.target.value)}>
@@ -214,7 +214,7 @@ export const SettingsPage = () => {
 
           {activeTab === 'backup' && (
             <div>
-              <h2>💾 Резервные копии</h2>
+              <h2 style={{ color: '#333', marginTop: 0 }}>💾 Резервные копии</h2>
               <div className="form-group" style={{ marginTop: '16px' }}>
                 <label>
                   <input
@@ -251,7 +251,7 @@ export const SettingsPage = () => {
 
           {activeTab === 'api' && (
             <div>
-              <h2>🔌 API Интеграции</h2>
+              <h2 style={{ color: '#333', marginTop: 0 }}>🔌 API Интеграции</h2>
               <div className="form-group" style={{ marginTop: '16px' }}>
                 <label>API Ключ</label>
                 <input
