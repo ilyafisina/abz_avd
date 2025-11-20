@@ -16,6 +16,7 @@ export interface User {
   firstName?: string;
   lastName?: string;
   isActive: boolean;
+  warehouse?: string; // площадка для менеджера и складовщика
   createdAt: Date;
   warehouseArea?: string; // для складовщиков - зона в складе
 }
@@ -25,10 +26,13 @@ export interface Product {
   id: string;
   name: string;
   sku: string; // артикул
+  barcode?: string; // штрихкод
+  qrCode?: string; // QR код
   category: string;
   quantity: number;
   minQuantity: number;
   location: string; // местоположение на складе
+  warehouse: string; // площадка (склад)
   supplier?: string;
   price: number;
   lastUpdated: Date;

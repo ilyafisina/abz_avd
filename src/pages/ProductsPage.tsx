@@ -1,48 +1,59 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import type { Product } from '../types';
 import { productService } from '../services/mockService';
+import { useAuth } from '../contexts/useAuth';
+import { useWarehouseFilter } from '../hooks/useWarehouseFilter';
+import { QRScanner } from '../components/QRScanner';
+import '../components/QRScanner.css';
 import './Pages.css';
 
 export const ProductsPage = () => {
+  const { user } = useAuth();
+  const { filterByWarehouse } = useWarehouseFilter();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
+    barcode: '',
+    qrCode: '',
     category: '',
     quantity: 0,
     minQuantity: 0,
     location: '',
+    warehouse: user?.warehouse || '',
     price: 0,
+    supplier: '',
   });
 
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    const data = await productService.getProducts();
-    setProducts(data);
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+    const initLoad = async () => {
+      const data = await productService.getProducts();
+      const filtered = filterByWarehouse(data);
+      setProducts(filtered);
+      setLoading(false);
+    };
+    initLoad();
+  }, [filterByWarehouse]);
 
   const categories = ['асфальтобетон', 'щебень', 'песок', 'битум'];
 
-  let filteredProducts = products.filter((p) => {
+  const filteredProducts = products.filter((p) => {
     const matchSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.barcode && p.barcode.includes(searchTerm));
     const matchCategory = filterCategory === 'all' || p.category === filterCategory;
     return matchSearch && matchCategory;
   });
 
-  filteredProducts.sort((a, b) => {
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
     switch (sortBy) {
       case 'name':
         return a.name.localeCompare(b.name);
@@ -76,11 +87,15 @@ export const ProductsPage = () => {
     setFormData({
       name: '',
       sku: '',
+      barcode: '',
+      qrCode: '',
       category: '',
       quantity: 0,
       minQuantity: 0,
       location: '',
+      warehouse: user?.warehouse || '',
       price: 0,
+      supplier: '',
     });
     setShowForm(false);
   };
@@ -89,11 +104,15 @@ export const ProductsPage = () => {
     setFormData({
       name: product.name,
       sku: product.sku,
+      barcode: product.barcode || '',
+      qrCode: product.qrCode || '',
       category: product.category,
       quantity: product.quantity,
       minQuantity: product.minQuantity,
       location: product.location,
+      warehouse: product.warehouse,
       price: product.price,
+      supplier: product.supplier || '',
     });
     setEditingId(product.id);
     setShowForm(true);
@@ -122,11 +141,15 @@ export const ProductsPage = () => {
             setFormData({
               name: '',
               sku: '',
+              barcode: '',
+              qrCode: '',
               category: '',
               quantity: 0,
               minQuantity: 0,
               location: '',
+              warehouse: user?.warehouse || '',
               price: 0,
+              supplier: '',
             });
           }}
         >
@@ -157,6 +180,35 @@ export const ProductsPage = () => {
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   placeholder="SKU"
                   required
+                />
+              </div>
+              <div className="form-group">
+                <label>Штрихкод</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={formData.barcode}
+                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                    placeholder="Штрихкод"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-small btn-primary"
+                    onClick={() => setShowScanner(!showScanner)}
+                    title="Сканировать QR/штрихкод"
+                  >
+                    📱
+                  </button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>QR код</label>
+                <input
+                  type="text"
+                  value={formData.qrCode}
+                  onChange={(e) => setFormData({ ...formData, qrCode: e.target.value })}
+                  placeholder="QR код"
                 />
               </div>
               <div className="form-group">
@@ -205,6 +257,25 @@ export const ProductsPage = () => {
                 />
               </div>
               <div className="form-group">
+                <label>Площадка (склад)</label>
+                <input
+                  type="text"
+                  value={formData.warehouse}
+                  onChange={(e) => setFormData({ ...formData, warehouse: e.target.value })}
+                  placeholder="Название площадки"
+                  disabled={user?.role !== 'admin'}
+                />
+              </div>
+              <div className="form-group">
+                <label>Поставщик</label>
+                <input
+                  type="text"
+                  value={formData.supplier}
+                  onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  placeholder="Название поставщика"
+                />
+              </div>
+              <div className="form-group">
                 <label>Цена за единицу</label>
                 <input
                   type="number"
@@ -216,6 +287,17 @@ export const ProductsPage = () => {
                 />
               </div>
             </div>
+            {showScanner && (
+              <div style={{ marginBottom: '16px' }}>
+                <QRScanner
+                  isActive={showScanner}
+                  onScan={(data) => {
+                    setFormData({ ...formData, barcode: data });
+                    setShowScanner(false);
+                  }}
+                />
+              </div>
+            )}
             <div className="form-actions">
               <button type="submit" className="btn-success">
                 {editingId ? 'Обновить' : 'Добавить'}
@@ -265,23 +347,27 @@ export const ProductsPage = () => {
             <tr>
               <th>Название</th>
               <th>SKU</th>
+              <th>Штрихкод</th>
               <th>Категория</th>
-              <th>Количество</th>
+              <th>Кол-во</th>
               <th>Место</th>
+              <th>Площадка</th>
               <th>Цена</th>
               <th>Статус</th>
               <th>Действия</th>
             </tr>
           </thead>
           <tbody>
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map((product) => (
+            {sortedProducts.length > 0 ? (
+              sortedProducts.map((product) => (
                 <tr key={product.id} className={product.quantity < product.minQuantity ? 'low-stock' : ''}>
                   <td className="product-name">{product.name}</td>
                   <td className="sku">{product.sku}</td>
+                  <td className="barcode">{product.barcode || '—'}</td>
                   <td>{product.category}</td>
                   <td className="quantity">{product.quantity}</td>
                   <td className="location">{product.location}</td>
+                  <td className="warehouse">{product.warehouse}</td>
                   <td className="price">₽{product.price.toFixed(2)}</td>
                   <td>
                     <span
@@ -304,7 +390,7 @@ export const ProductsPage = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={8} className="empty-cell">
+                <td colSpan={10} className="empty-cell">
                   Товары не найдены
                 </td>
               </tr>
@@ -316,16 +402,16 @@ export const ProductsPage = () => {
       <div className="page-stats">
         <div className="stat-item">
           <span className="stat-label">Всего товаров:</span>
-          <span className="stat-value">{filteredProducts.length}</span>
+          <span className="stat-value">{sortedProducts.length}</span>
         </div>
         <div className="stat-item">
           <span className="stat-label">На складе:</span>
-          <span className="stat-value">{filteredProducts.reduce((sum, p) => sum + p.quantity, 0)} ед.</span>
+          <span className="stat-value">{sortedProducts.reduce((sum, p) => sum + p.quantity, 0)} ед.</span>
         </div>
         <div className="stat-item">
           <span className="stat-label">Общая стоимость:</span>
           <span className="stat-value">
-            ₽{filteredProducts.reduce((sum, p) => sum + p.price * p.quantity, 0).toFixed(2)}
+            ₽{sortedProducts.reduce((sum, p) => sum + p.price * p.quantity, 0).toFixed(2)}
           </span>
         </div>
       </div>

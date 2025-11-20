@@ -1,24 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import type { Product, CategorySummary } from '../types';
 import { productService } from '../services/mockService';
+import { useWarehouseFilter } from '../hooks/useWarehouseFilter';
 import './Pages.css';
 
 export const ReportsPage = () => {
+  const { filterByWarehouse } = useWarehouseFilter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportType, setReportType] = useState('inventory');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    const data = await productService.getProducts();
-    setProducts(data);
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
+    const loadProducts = async () => {
+      setLoading(true);
+      const data = await productService.getProducts();
+      const filtered = filterByWarehouse(data);
+      setProducts(filtered);
+      setLoading(false);
+    };
     loadProducts();
-  }, [loadProducts]);
+  }, [filterByWarehouse]);
 
   const calculateStats = () => {
     let filtered = products;
