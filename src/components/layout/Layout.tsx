@@ -6,7 +6,18 @@ import './Layout.css';
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [sidebarOpen, setSidebarOpen] = React.useState(window.innerWidth >= 768);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      // Закрыть sidebar на мобильных, открыть на десктопе
+      setSidebarOpen(!isMobile);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -44,74 +55,76 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       </nav>
 
+      {sidebarOpen && window.innerWidth < 768 && (
+        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
+      )}
+
       <div className="layout-container">
-        {sidebarOpen && (
-          <aside className="sidebar">
-            <div className="sidebar-content">
-              <nav className="sidebar-nav">
+        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+          <div className="sidebar-content">
+            <nav className="sidebar-nav">
+              <div className="nav-section">
+                <h3>Главное</h3>
+                <a href="/dashboard" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                  📊 Панель управления
+                </a>
+              </div>
+
+              {(user?.role === 'warehouseman' || user?.role === 'manager') && (
                 <div className="nav-section">
-                  <h3>Главное</h3>
-                  <a href="/dashboard" className="nav-link">
-                    📊 Панель управления
+                  <h3>Товары</h3>
+                  <a href="/products" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    📦 Товары
+                  </a>
+                  <a href="/requests" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    📋 Заявки
                   </a>
                 </div>
+              )}
 
-                {(user?.role === 'warehouseman' || user?.role === 'manager') && (
-                  <div className="nav-section">
-                    <h3>Товары</h3>
-                    <a href="/products" className="nav-link">
-                      📦 Товары
-                    </a>
-                    <a href="/requests" className="nav-link">
-                      📋 Заявки
-                    </a>
-                  </div>
-                )}
-
-                {(user?.role === 'manager' || user?.role === 'admin') && (
-                  <div className="nav-section">
-                    <h3>Управление</h3>
-                    <a href="/locations" className="nav-link">
-                      📍 Местоположения
-                    </a>
-                    <a href="/reports" className="nav-link">
-                      📈 Отчёты
-                    </a>
-                  </div>
-                )}
-
-                {user?.role === 'admin' && (
-                  <div className="nav-section">
-                    <h3>Администрация</h3>
-                    <a href="/users" className="nav-link">
-                      👥 Пользователи
-                    </a>
-                    <a href="/logs" className="nav-link">
-                      📜 Логи системы
-                    </a>
-                    <a href="/settings" className="nav-link">
-                      ⚙️ Настройки
-                    </a>
-                  </div>
-                )}
-
+              {(user?.role === 'manager' || user?.role === 'admin') && (
                 <div className="nav-section">
-                  <h3>Профиль</h3>
-                  <a href="/profile" className="nav-link">
-                    👤 Мой профиль
+                  <h3>Управление</h3>
+                  <a href="/locations" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    📍 Местоположения
                   </a>
-                  <a href="/help" className="nav-link">
-                    ❓ Помощь
+                  <a href="/reports" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    📈 Отчёты
                   </a>
                 </div>
-              </nav>
-            </div>
+              )}
 
-            <div className="sidebar-footer">
-              <p className="version">v1.0.0</p>
-            </div>
-          </aside>
-        )}
+              {user?.role === 'admin' && (
+                <div className="nav-section">
+                  <h3>Администрация</h3>
+                  <a href="/users" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    👥 Пользователи
+                  </a>
+                  <a href="/logs" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    📜 Логи системы
+                  </a>
+                  <a href="/settings" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    ⚙️ Настройки
+                  </a>
+                </div>
+              )}
+
+              <div className="nav-section">
+                <h3>Профиль</h3>
+                <a href="/profile" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                  👤 Мой профиль
+                </a>
+                <a href="/help" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                  ❓ Помощь
+                </a>
+              </div>
+            </nav>
+          </div>
+
+          <div className="sidebar-footer">
+            <p className="version">v1.0.0</p>
+          </div>
+        </aside>
 
         <main className="main-content">{children}</main>
       </div>
