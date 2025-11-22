@@ -292,8 +292,16 @@ export const ProductsPage = () => {
                 <QRScanner
                   isActive={showScanner}
                   onScan={(data) => {
-                    setFormData({ ...formData, barcode: data });
-                    setShowScanner(false);
+                    console.log('✓ QR Scanner: Получены данные:', data);
+                    setFormData((prevData) => {
+                      const newData = { ...prevData, barcode: data };
+                      console.log('✓ QR Scanner: Обновляем formData:', newData);
+                      return newData;
+                    });
+                    setTimeout(() => {
+                      console.log('✓ QR Scanner: Закрываем сканер');
+                      setShowScanner(false);
+                    }, 500);
                   }}
                 />
               </div>

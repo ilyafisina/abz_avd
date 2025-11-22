@@ -1,7 +1,7 @@
 /* Warehouseman Dashboard Styles */
 .warehouseman-dashboard {
   padding: 0;
-  background-color: #f5f7fa;
+  background-color: var(--neutral-light);
   min-height: 100%;
   width: 100%;
 }
@@ -9,16 +9,25 @@
 .tab-content {
   width: 100%;
   padding: 20px;
+  background-color: var(--neutral-light);
 }
 
 .dashboard h1 {
-  color: #2c3e50;
+  color: var(--neutral-dark);
   margin: 0 0 4px 0;
   font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard h1 svg {
+  stroke: var(--primary-blue);
 }
 
 .dashboard .subtitle {
-  color: #7f8c8d;
+  color: var(--neutral-gray);
   margin: 0 0 20px 0;
   font-size: 13px;
 }
@@ -27,7 +36,7 @@
   display: flex;
   gap: 8px;
   margin-bottom: 20px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--neutral-gray-light);
   overflow-x: auto;
 }
 
@@ -37,29 +46,40 @@
   padding: 10px 20px;
   font-size: 13px;
   font-weight: 600;
-  color: #7f8c8d;
+  color: var(--neutral-gray);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   border-bottom: 3px solid transparent;
   margin-bottom: -2px;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 2;
 }
 
 .tab-btn:hover {
-  color: #2c3e50;
+  color: var(--neutral-dark);
 }
 
 .tab-btn.active {
-  color: #3498db;
-  border-bottom-color: #3498db;
+  color: var(--primary-blue);
+  border-bottom-color: var(--primary-blue);
 }
 
 .section {
-  background: white;
-  border-radius: 6px;
+  background: var(--neutral-white);
+  border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--neutral-gray-light);
 }
 
 .section-header {
@@ -70,23 +90,24 @@
 }
 
 .section h2 {
-  color: #2c3e50;
+  color: var(--neutral-dark);
   font-size: 18px;
   margin: 0;
+  font-weight: 600;
 }
 
 .low-stock-badge {
-  background-color: #ecf0f1;
-  color: #7f8c8d;
+  background-color: var(--neutral-light);
+  color: var(--neutral-gray);
   padding: 6px 12px;
-  border-radius: 3px;
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
 }
 
 .low-stock-badge.alert {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: #fef2f2;
+  color: #dc2626;
 }
 
 .products-grid {
@@ -97,21 +118,21 @@
 }
 
 .product-card {
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  border: 1px solid var(--neutral-gray-light);
+  border-radius: 8px;
   padding: 12px;
-  background: white;
-  transition: all 0.3s ease;
+  background: var(--neutral-white);
+  transition: all 0.2s ease;
 }
 
 .product-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
+  border-color: var(--primary-blue);
 }
 
 .product-card.low-stock {
-  border-left: 4px solid #f39c12;
-  background-color: #fffaf0;
+  border-left: 4px solid #f59e0b;
+  background-color: #fffbeb;
 }
 
 .product-header {
@@ -120,14 +141,15 @@
 
 .product-header h3 {
   margin: 0 0 4px 0;
-  color: #2c3e50;
+  color: var(--neutral-dark);
   font-size: 14px;
   font-weight: 600;
 }
 
 .sku {
-  color: #95a5a6;
+  color: var(--neutral-gray);
   font-size: 11px;
+  font-family: 'Monaco', 'Courier New', monospace;
 }
 
 .product-details {
@@ -145,39 +167,41 @@
 }
 
 .detail-row .label {
-  color: #7f8c8d;
+  color: var(--neutral-gray);
   font-weight: 500;
 }
 
 .detail-row .value {
-  color: #2c3e50;
+  color: var(--neutral-dark);
   font-weight: 600;
 }
 
 .detail-row .quantity {
   font-size: 13px;
   font-weight: 700;
-  color: #27ae60;
+  color: #10b981;
 }
 
 .detail-row .location {
-  background-color: #ecf0f1;
+  background-color: var(--primary-blue-light);
+  color: var(--primary-blue);
   padding: 2px 6px;
-  border-radius: 2px;
-  font-family: monospace;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Courier New', monospace;
   font-size: 10px;
+  font-weight: 600;
 }
 
 .detail-row .price {
-  color: #e74c3c;
+  color: #06b6d4;
   font-weight: 700;
 }
 
 .warning {
-  background-color: #fef5e7;
-  color: #f39c12;
+  background-color: #fef3c7;
+  color: #92400e;
   padding: 8px;
-  border-radius: 3px;
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
   text-align: center;
@@ -195,38 +219,38 @@
 }
 
 .requests-table thead {
-  background-color: #ecf0f1;
+  background-color: var(--neutral-light);
 }
 
 .requests-table th {
   padding: 10px;
   text-align: left;
-  color: #2c3e50;
+  color: var(--neutral-dark);
   font-weight: 600;
-  border-bottom: 2px solid #bdc3c7;
+  border-bottom: 1px solid var(--neutral-gray-light);
   white-space: nowrap;
 }
 
 .requests-table td {
   padding: 10px;
-  border-bottom: 1px solid #ecf0f1;
-  color: #2c3e50;
+  border-bottom: 1px solid var(--neutral-gray-light);
+  color: var(--neutral-dark);
 }
 
 .requests-table tbody tr:hover {
-  background-color: #f9f9f9;
+  background-color: var(--primary-blue-light);
 }
 
 .request-number {
   font-weight: 600;
-  color: #3498db;
-  font-family: monospace;
+  color: var(--primary-blue);
+  font-family: 'Monaco', 'Courier New', monospace;
   font-size: 11px;
 }
 
 .status {
   padding: 3px 10px;
-  border-radius: 3px;
+  border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
   display: inline-block;
@@ -234,28 +258,28 @@
 }
 
 .status-pending {
-  background-color: #fff3cd;
-  color: #856404;
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
 .status-approved {
-  background-color: #d4edda;
-  color: #155724;
+  background-color: #d1fae5;
+  color: #065f46;
 }
 
 .status-rejected {
-  background-color: #f8d7da;
-  color: #721c24;
+  background-color: #fee2e2;
+  color: #7f1d1d;
 }
 
 .status-completed {
-  background-color: #d1ecf1;
-  color: #0c5460;
+  background-color: var(--primary-blue-light);
+  color: var(--primary-blue);
 }
 
 .priority {
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: 3px;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -264,24 +288,24 @@
 }
 
 .priority-low {
-  background-color: #e8f5e9;
-  color: #2e7d32;
+  background-color: #d1fae5;
+  color: #065f46;
 }
 
 .priority-normal {
-  background-color: #f3e5f5;
-  color: #6a1b9a;
+  background-color: #faf5ff;
+  color: #6b21a8;
 }
 
 .priority-high {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: #fee2e2;
+  color: #7f1d1d;
 }
 
 .empty-state {
   text-align: center;
   padding: 30px;
-  color: #7f8c8d;
+  color: var(--neutral-gray);
 }
 
 .empty-state p {
@@ -292,7 +316,7 @@
 .loading {
   text-align: center;
   padding: 30px;
-  color: #3498db;
+  color: var(--primary-blue);
   font-weight: 600;
 }
 

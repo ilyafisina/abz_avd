@@ -1,6 +1,20 @@
 import React from 'react';
 import { useAuth } from '../../contexts/useAuth';
 import { useNavigate } from 'react-router-dom';
+import {
+  FiMenu,
+  FiLogOut,
+  FiBarChart2,
+  FiBox,
+  FiClipboard,
+  FiMapPin,
+  FiTrendingUp,
+  FiUsers,
+  FiList,
+  FiSettings,
+  FiUser,
+  FiHelpCircle,
+} from 'react-icons/fi';
 import './Layout.css';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -38,7 +52,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               onClick={() => setSidebarOpen(!sidebarOpen)}
               title="Открыть/закрыть меню"
             >
-              ☰
+              <FiMenu size={24} />
             </button>
             <h2>АБЗ ВАД</h2>
           </div>
@@ -49,7 +63,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <small>{getRoleLabel(user?.role || '')}</small>
             </span>
             <button className="btn-logout" onClick={handleLogout} title="Выход">
-              🚪
+              <FiLogOut size={20} />
             </button>
           </div>
         </div>
@@ -66,7 +80,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <div className="nav-section">
                 <h3>Главное</h3>
                 <a href="/dashboard" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                  📊 Панель управления
+                  <FiBarChart2 />
+                  <span>Панель управления</span>
                 </a>
               </div>
 
@@ -74,10 +89,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <div className="nav-section">
                   <h3>Товары</h3>
                   <a href="/products" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    📦 Товары
+                    <FiBox />
+                    <span>Товары</span>
                   </a>
                   <a href="/requests" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    📋 Заявки
+                    <FiClipboard />
+                    <span>Заявки</span>
                   </a>
                 </div>
               )}
@@ -86,10 +103,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <div className="nav-section">
                   <h3>Управление</h3>
                   <a href="/locations" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    📍 Местоположения
+                    <FiMapPin />
+                    <span>Местоположения</span>
                   </a>
                   <a href="/reports" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    📈 Отчёты
+                    <FiTrendingUp />
+                    <span>Отчёты</span>
                   </a>
                 </div>
               )}
@@ -98,13 +117,16 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <div className="nav-section">
                   <h3>Администрация</h3>
                   <a href="/users" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    👥 Пользователи
+                    <FiUsers />
+                    <span>Пользователи</span>
                   </a>
                   <a href="/logs" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    📜 Логи системы
+                    <FiList />
+                    <span>Логи системы</span>
                   </a>
                   <a href="/settings" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    ⚙️ Настройки
+                    <FiSettings />
+                    <span>Настройки</span>
                   </a>
                 </div>
               )}
@@ -112,10 +134,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <div className="nav-section">
                 <h3>Профиль</h3>
                 <a href="/profile" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                  👤 Мой профиль
+                  <FiUser />
+                  <span>Мой профиль</span>
                 </a>
                 <a href="/help" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                  ❓ Помощь
+                  <FiHelpCircle />
+                  <span>Помощь</span>
                 </a>
               </div>
             </nav>

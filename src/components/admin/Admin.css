@@ -1,7 +1,7 @@
 /* Admin Dashboard Styles */
 .admin-dashboard {
   padding: 0;
-  background-color: #f5f7fa;
+  background-color: var(--neutral-light);
   min-height: 100%;
   width: 100%;
 }
@@ -9,6 +9,7 @@
 .tab-content {
   width: 100%;
   padding: 20px;
+  background-color: var(--neutral-light);
 }
 
 .users-table,
