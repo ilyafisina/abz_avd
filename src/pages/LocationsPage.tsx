@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/useAuth';
 import type { Product } from '../types';
 import { productService } from '../services/mockService';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import './Pages.css';
 
 interface Warehouse {
@@ -199,6 +201,46 @@ export const LocationsPage = () => {
     });
   };
 
+  const pdfRef = useRef<HTMLDivElement>(null);
+
+  const exportToPDF = async (warehouse: Warehouse) => {
+    if (!pdfRef.current) return;
+
+    try {
+      const element = pdfRef.current;
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const imgWidth = 210;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= 297;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= 297;
+      }
+
+      pdf.save(`${warehouse.name}_${new Date().getTime()}.pdf`);
+    } catch (error) {
+      console.error('Ошибка при экспорте в PDF:', error);
+      alert('Ошибка при экспорте в PDF');
+    }
+  };
+
   if (loading) {
     return <div className="page-container"><div className="loading">Загрузка площадок...</div></div>;
   }
@@ -211,7 +253,7 @@ export const LocationsPage = () => {
     const warehouseProducts = getWarehouseProducts(warehouse.area);
 
     return (
-      <div className="page-container">
+      <div ref={pdfRef} className="page-container">
         <div className="page-header">
           <button 
             onClick={() => setSelectedWarehouse(null)}
@@ -229,15 +271,24 @@ export const LocationsPage = () => {
           <div className="card-plain">
             <div className="justify-space">
               <h3 className="no-margin">Информация о площадке</h3>
-              {canEdit && (
-                <button 
-                  onClick={() => setIsEditing(!isEditing)}
-                  className={isEditing ? 'btn-secondary' : 'btn-primary'}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {canEdit && (
+                  <button 
+                    onClick={() => setIsEditing(!isEditing)}
+                    className={isEditing ? 'btn-secondary' : 'btn-primary'}
+                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                  >
+                    {isEditing ? 'Отмена' : 'Редактировать'}
+                  </button>
+                )}
+                <button
+                  onClick={() => exportToPDF(warehouse)}
+                  className="btn-primary"
                   style={{ padding: '6px 12px', fontSize: '12px' }}
                 >
-                  {isEditing ? 'Отмена' : 'Редактировать'}
+                  Экспорт PDF
                 </button>
-              )}
+              </div>
             </div>
 
             {!isEditing ? (
