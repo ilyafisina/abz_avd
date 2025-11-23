@@ -167,10 +167,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                     <FiList />
                     <span>Логи системы</span>
                   </a>
-                  <a href="/settings" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    <FiSettings />
-                    <span>Настройки</span>
-                  </a>
                 </div>
               )}
 
@@ -179,6 +175,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <a href="/profile" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
                   <FiUser />
                   <span>Мой профиль</span>
+                </a>
+                <a href="/settings" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                  <FiSettings />
+                  <span>Настройки</span>
                 </a>
                 <a href="/help" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
                   <FiHelpCircle />
