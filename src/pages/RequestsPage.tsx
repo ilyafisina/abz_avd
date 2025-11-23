@@ -95,15 +95,6 @@ export const RequestsPage = () => {
     return statusMap[status] || status;
   };
 
-  const getPriorityColor = (priority: string | undefined) => {
-    const priorityMap: { [key: string]: string } = {
-      low: '#e8f5e9',
-      normal: '#f3e5f5',
-      high: '#ffebee',
-    };
-    return priorityMap[priority || 'normal'] || '#ffffff';
-  };
-
   if (loading) {
     return <div className="page-container"><div className="loading">Загрузка заявок...</div></div>;
   }
@@ -254,8 +245,7 @@ export const RequestsPage = () => {
           filteredRequests.map((request) => (
             <div
               key={request.requestNumber}
-              className="request-card"
-              style={{ borderLeftColor: getPriorityColor(request.priority) }}
+              className={`request-card priority-${request.priority || 'normal'}`}
               onClick={() => setSelectedRequest(request)}
             >
               <div className="request-card-header">

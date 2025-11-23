@@ -180,34 +180,18 @@ export const QRScanner = ({ onScan, isActive }: QRScannerProps) => {
     <div className="qr-scanner">
       {isActive ? (
         <>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="scanner-video"
-            style={{
-              width: '100%',
-              height: '100%',
-              maxHeight: '400px',
-              objectFit: 'cover',
-              backgroundColor: '#000',
-              display: 'block',
-            }}
-          />
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
+          <video ref={videoRef} autoPlay playsInline muted className="scanner-video" />
+          <canvas ref={canvasRef} className="hidden-canvas" />
           <div className="scanner-status">
             {error && (
-              <div className="scanner-error" style={{ whiteSpace: 'pre-wrap', textAlign: 'left' }}>
-                {error}
-              </div>
+              <div className="scanner-error">{error}</div>
             )}
             {!error && <div className="scanner-hint">{status}</div>}
           </div>
 
           {/* Fallback ввод вручную */}
-          <div className="scanner-manual" style={{ marginTop: '12px', padding: '12px' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="scanner-manual">
+            <div className="input-row">
               <input
                 ref={manualInputRef}
                 type="text"
@@ -216,28 +200,9 @@ export const QRScanner = ({ onScan, isActive }: QRScannerProps) => {
                 onKeyPress={(e) => e.key === 'Enter' && handleManualScan()}
                 placeholder="Или введите код вручную..."
                 autoFocus
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                }}
+                className="scanner-input"
               />
-              <button
-                onClick={handleManualScan}
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: '#3498db',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
-              >
-                ✓
-              </button>
+              <button onClick={handleManualScan} className="scanner-btn">✓</button>
             </div>
           </div>
         </>

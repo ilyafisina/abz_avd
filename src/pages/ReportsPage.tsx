@@ -93,7 +93,7 @@ export const ReportsPage = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>📊 Отчёты</h1>
+        <h1>Отчёты</h1>
         <p>Анализ данных склада и товаров</p>
       </div>
 
@@ -117,7 +117,7 @@ export const ReportsPage = () => {
             </select>
           </div>
         )}
-        <button className="filter-btn" onClick={exportToCSV}>📥 Экспортировать CSV</button>
+        <button className="filter-btn" onClick={exportToCSV}>Экспортировать CSV</button>
       </div>
 
       {reportType === 'inventory' && (
@@ -137,7 +137,7 @@ export const ReportsPage = () => {
             </div>
             <div className="stat-item">
               <span className="stat-label">Критические запасы:</span>
-              <span className="stat-value" style={{ color: '#d32f2f' }}>{stats.lowStockItems.length}</span>
+              <span className="stat-value danger-text">{stats.lowStockItems.length}</span>
             </div>
           </div>
 
@@ -160,7 +160,7 @@ export const ReportsPage = () => {
                   const isLowStock = product.quantity <= product.minQuantity;
                   const sum = product.quantity * product.price;
                   return (
-                    <tr key={product.id} style={{ backgroundColor: isLowStock ? '#ffebee' : '' }}>
+                    <tr key={product.id} className={isLowStock ? 'low-stock' : ''}>
                       <td>{product.name}</td>
                       <td>{product.sku}</td>
                       <td>{product.category}</td>
@@ -231,7 +231,7 @@ export const ReportsPage = () => {
           <div className="page-stats">
             <div className="stat-item">
               <span className="stat-label">Критических товаров:</span>
-              <span className="stat-value" style={{ color: '#d32f2f' }}>{stats.lowStockItems.length}</span>
+              <span className="stat-value danger-text">{stats.lowStockItems.length}</span>
             </div>
             <div className="stat-item">
               <span className="stat-label">Всего товаров:</span>
@@ -255,15 +255,13 @@ export const ReportsPage = () => {
                 </thead>
                 <tbody>
                   {stats.lowStockItems.map(product => (
-                    <tr key={product.id} style={{ backgroundColor: '#ffebee' }}>
+                    <tr key={product.id} className="low-stock">
                       <td>{product.name}</td>
                       <td>{product.sku}</td>
                       <td>{product.category}</td>
                       <td>{product.quantity}</td>
                       <td>{product.minQuantity}</td>
-                      <td style={{ color: '#d32f2f', fontWeight: 'bold' }}>
-                        -{(product.minQuantity - product.quantity)}
-                      </td>
+                      <td className="deficit-cell">-{(product.minQuantity - product.quantity)}</td>
                       <td>{product.location}</td>
                     </tr>
                   ))}
@@ -272,7 +270,7 @@ export const ReportsPage = () => {
             </div>
           ) : (
             <div className="empty-state">
-              <p>✓ Все товары имеют достаточный запас</p>
+              <p>Все товары имеют достаточный запас</p>
             </div>
           )}
         </>

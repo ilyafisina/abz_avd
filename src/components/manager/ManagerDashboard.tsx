@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiBox, FiAlertTriangle, FiClipboard, FiDollarSign } from 'react-icons/fi';
 import { productService, requestService } from '../../services/mockService';
 import type { Product, Request } from '../../types';
 import './Manager.css';
@@ -34,57 +35,34 @@ export const ManagerDashboard: React.FC = () => {
 
   return (
     <div className="dashboard manager-dashboard">
-      <h1>👔 Панель Менеджера</h1>
+      <h1>Панель менеджера</h1>
       <p className="subtitle">Управление заявками и мониторинг запасов</p>
-
-      {/* Dashboard Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>📦 Товары на складе</p>
-          <p style={{ margin: '0', color: '#2c3e50', fontSize: '28px', fontWeight: 'bold' }}>{totalProducts}</p>
-          <p style={{ margin: '8px 0 0 0', color: '#7f8c8d', fontSize: '11px' }}>Всего стоимость: ₽{(totalValue / 1000).toFixed(1)}k</p>
-        </div>
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>📋 В ожидании</p>
-          <p style={{ margin: '0', color: '#f39c12', fontSize: '28px', fontWeight: 'bold' }}>{activeRequests}</p>
-          <p style={{ margin: '8px 0 0 0', color: '#7f8c8d', fontSize: '11px' }}>Активные заявки</p>
-        </div>
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>✓ Одобрено</p>
-          <p style={{ margin: '0', color: '#27ae60', fontSize: '28px', fontWeight: 'bold' }}>{requests.filter(r => r.status === 'approved').length}</p>
-          <p style={{ margin: '8px 0 0 0', color: '#7f8c8d', fontSize: '11px' }}>Одобренные заявки</p>
-        </div>
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <p style={{ margin: '0 0 8px 0', color: '#7f8c8d', fontSize: '12px', textTransform: 'uppercase' }}>⚠️ Критический</p>
-          <p style={{ margin: '0', color: '#e74c3c', fontSize: '28px', fontWeight: 'bold' }}>{products.filter(p => p.quantity <= p.minQuantity).length}</p>
-          <p style={{ margin: '8px 0 0 0', color: '#7f8c8d', fontSize: '11px' }}>Низкие запасы</p>
-        </div>
-      </div>
+      
 
       <div className="dashboard-tabs">
         <button
           className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
-          📊 Обзор
+          Обзор
         </button>
         <button
           className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
           onClick={() => setActiveTab('requests')}
         >
-          📋 Заявки
+          Заявки
         </button>
         <button
           className={`tab-btn ${activeTab === 'locations' ? 'active' : ''}`}
           onClick={() => setActiveTab('locations')}
         >
-          📍 Местоположения
+          Местоположения
         </button>
         <button
           className={`tab-btn ${activeTab === 'report' ? 'active' : ''}`}
           onClick={() => setActiveTab('report')}
         >
-          📈 Отчёт
+          Отчёт
         </button>
       </div>
 
@@ -131,7 +109,7 @@ const OverviewTab: React.FC<{
     <div className="section">
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon">💰</div>
+          <div className="stat-icon"><FiDollarSign size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Общая стоимость запасов</p>
             <p className="stat-value">₽{totalValue.toLocaleString()}</p>
@@ -139,7 +117,7 @@ const OverviewTab: React.FC<{
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">📦</div>
+          <div className="stat-icon"><FiBox size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Всего товаров</p>
             <p className="stat-value">{totalProducts}</p>
@@ -147,7 +125,7 @@ const OverviewTab: React.FC<{
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">📋</div>
+          <div className="stat-icon"><FiClipboard size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Активные заявки</p>
             <p className="stat-value">{activeRequests}</p>
@@ -155,7 +133,7 @@ const OverviewTab: React.FC<{
         </div>
 
         <div className={`stat-card ${lowStockCount > 0 ? 'alert' : ''}`}>
-          <div className="stat-icon">⚠️</div>
+          <div className="stat-icon"><FiAlertTriangle size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Низкий уровень запасов</p>
             <p className="stat-value">{lowStockCount}</p>
@@ -164,8 +142,8 @@ const OverviewTab: React.FC<{
       </div>
 
       {lowStockCount > 0 && (
-        <div className="alert-section">
-          <h3>⚠️ Товары с низким уровнем запасов:</h3>
+          <div className="alert-section">
+          <h3>Товары с низким уровнем запасов:</h3>
           <ul className="low-stock-list">
             {products
               .filter(p => p.quantity <= p.minQuantity)
@@ -192,7 +170,7 @@ const RequestsTab: React.FC<{
       <div className="section-header">
         <h2>Управление заявками</h2>
         <button className="btn btn-small" onClick={() => setNewRequestForm(!newRequestForm)}>
-          ➕ Новая заявка
+          Новая заявка
         </button>
       </div>
 
@@ -221,8 +199,8 @@ const RequestsTab: React.FC<{
             <div className="request-actions">
               {request.status === 'pending' && (
                 <>
-                  <button className="btn btn-success btn-small">✅ Одобрить</button>
-                  <button className="btn btn-danger btn-small">❌ Отклонить</button>
+                  <button className="btn btn-success btn-small">Одобрить</button>
+                  <button className="btn btn-danger btn-small">Отклонить</button>
                 </>
               )}
             </div>

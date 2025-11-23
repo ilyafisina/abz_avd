@@ -14,6 +14,8 @@ import {
   FiSettings,
   FiUser,
   FiHelpCircle,
+  FiSun,
+  FiMoon,
 } from 'react-icons/fi';
 import './Layout.css';
 
@@ -21,6 +23,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(window.innerWidth >= 768);
+  const [theme, setTheme] = React.useState<'light' | 'dark' | 'auto'>(() => {
+    try {
+      const t = localStorage.getItem('appTheme');
+      return (t === 'dark' || t === 'light' || t === 'auto') ? (t as 'light' | 'dark' | 'auto') : 'light';
+    } catch {
+      return 'light';
+    }
+  });
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -33,6 +43,28 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Apply theme class on mount / theme change
+  React.useEffect(() => {
+    let mq: MediaQueryList | null = null;
+    try {
+      const apply = (useDark: boolean) => {
+        if (useDark) document.documentElement.classList.add('theme-dark'); else document.documentElement.classList.remove('theme-dark');
+      };
+
+      if (theme === 'auto') {
+        mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+        apply(mq ? mq.matches : false);
+        // save preference marker
+        localStorage.setItem('appTheme', 'auto');
+      } else {
+        apply(theme === 'dark');
+        localStorage.setItem('appTheme', theme);
+      }
+    } catch {
+      // ignore
+    }
+  }, [theme]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
@@ -44,7 +76,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   return (
     <div className="layout">
-      <nav className="navbar">
+      <nav className="navbar glass">
         <div className="navbar-container">
           <div className="navbar-brand">
             <button
@@ -62,19 +94,30 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               {user?.firstName} {user?.lastName}
               <small>{getRoleLabel(user?.role || '')}</small>
             </span>
-            <button className="btn-logout" onClick={handleLogout} title="Выход">
-              <FiLogOut size={20} />
-            </button>
+            <div className="actions">
+              <button
+                className="btn-theme-toggle"
+                onClick={() => setTheme(prev => (prev === 'light' ? 'dark' : 'light'))}
+                title={theme === 'light' ? 'Включить тёмную тему' : 'Отключить тёмную тему'}
+                aria-label="toggle-theme"
+              >
+                {theme === 'light' ? <FiMoon size={18} /> : <FiSun size={18} />}
+              </button>
+
+              <button className="btn-logout" onClick={handleLogout} title="Выход">
+                <FiLogOut size={20} />
+              </button>
+            </div>
           </div>
         </div>
       </nav>
 
       {sidebarOpen && window.innerWidth < 768 && (
-        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
+        <div className="sidebar-backdrop visible" onClick={() => setSidebarOpen(false)} />
       )}
 
       <div className="layout-container">
-        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <aside className={`sidebar ${sidebarOpen ? 'open' : ''} glass`}>
           <div className="sidebar-content">
             <nav className="sidebar-nav">
               <div className="nav-section">
@@ -150,7 +193,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </div>
         </aside>
 
-        <main className="main-content">{children}</main>
+        <main className="main-content"><div className="glass-wrap">{children}</div></main>
       </div>
     </div>
   );

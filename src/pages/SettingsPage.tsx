@@ -29,6 +29,20 @@ export const SettingsPage = () => {
     // Имитация сохранения
     setTimeout(() => {
       setSaved(true);
+      // Apply theme selection immediately
+      try {
+        if (settings.theme === 'auto') {
+          localStorage.setItem('appTheme', 'auto');
+          // apply system preference
+          const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (prefersDark) document.documentElement.classList.add('theme-dark'); else document.documentElement.classList.remove('theme-dark');
+        } else {
+          localStorage.setItem('appTheme', settings.theme as string);
+          if (settings.theme === 'dark') document.documentElement.classList.add('theme-dark'); else document.documentElement.classList.remove('theme-dark');
+        }
+      } catch {
+        // ignore storage errors
+      }
       setTimeout(() => setSaved(false), 3000);
     }, 500);
   };
@@ -40,8 +54,8 @@ export const SettingsPage = () => {
         <p>Конфигурация и параметры приложения</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '20px', marginBottom: '20px', gridTemplateRows: 'auto' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="settings-layout">
+        <aside className="settings-sidebar">
           {[
             { id: 'general', label: '🔧 Общие' },
             { id: 'warehouse', label: '📦 Склад' },
@@ -53,28 +67,18 @@ export const SettingsPage = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px',
-                border: activeTab === tab.id ? '2px solid #1976d2' : '1px solid #ddd',
-                borderRadius: '4px',
-                backgroundColor: activeTab === tab.id ? '#e3f2fd' : '#fff',
-                cursor: 'pointer',
-                textAlign: 'left',
-                fontWeight: activeTab === tab.id ? '600' : '400',
-                color: '#333',
-                minWidth: '160px',
-              }}
+              className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
             >
               {tab.label}
             </button>
           ))}
-        </div>
+        </aside>
 
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #eee', color: '#333' }}>
+        <div className="settings-content form-card">
           {activeTab === 'general' && (
             <div>
-              <h2 style={{ color: '#333', marginTop: 0 }}>🔧 Общие настройки</h2>
-              <div className="form-group" style={{ marginTop: '16px' }}>
+              <h2 className="settings-section-title">🔧 Общие настройки</h2>
+              <div className="form-group mt-16">
                 <label>Название склада</label>
                 <input
                   type="text"
@@ -133,8 +137,8 @@ export const SettingsPage = () => {
 
           {activeTab === 'warehouse' && (
             <div>
-              <h2 style={{ color: '#333', marginTop: 0 }}>📦 Настройки склада</h2>
-              <div className="form-group" style={{ marginTop: '16px' }}>
+              <h2 className="settings-section-title">📦 Настройки склада</h2>
+              <div className="form-group mt-16">
                 <label>
                   <input
                     type="checkbox"
@@ -155,7 +159,7 @@ export const SettingsPage = () => {
                 </div>
               )}
               <div className="form-group">
-                <p style={{ color: '#666', fontSize: '14px' }}>
+                <p className="muted">
                   📝 <strong>Информация:</strong> Здесь вы можете настроить параметры управления товарами и запасами на складе.
                 </p>
               </div>
@@ -164,8 +168,8 @@ export const SettingsPage = () => {
 
           {activeTab === 'notifications' && (
             <div>
-              <h2 style={{ color: '#333', marginTop: 0 }}>🔔 Уведомления</h2>
-              <div className="form-group" style={{ marginTop: '16px' }}>
+              <h2 className="settings-section-title">🔔 Уведомления</h2>
+              <div className="form-group mt-16">
                 <label>
                   <input
                     type="checkbox"
@@ -186,7 +190,7 @@ export const SettingsPage = () => {
                 </label>
               </div>
               <div className="form-group">
-                <p style={{ color: '#666', fontSize: '14px' }}>
+                <p className="muted">
                   💡 <strong>Совет:</strong> Включите уведомления, чтобы получать важную информацию о товарах и заявках.
                 </p>
               </div>
@@ -195,8 +199,8 @@ export const SettingsPage = () => {
 
           {activeTab === 'appearance' && (
             <div>
-              <h2 style={{ color: '#333', marginTop: 0 }}>🎨 Внешний вид</h2>
-              <div className="form-group" style={{ marginTop: '16px' }}>
+              <h2 className="settings-section-title">🎨 Внешний вид</h2>
+              <div className="form-group mt-16">
                 <label>Тема оформления</label>
                 <select value={settings.theme} onChange={(e) => handleChange('theme', e.target.value)}>
                   <option value="light">☀️ Светлая</option>
@@ -205,7 +209,7 @@ export const SettingsPage = () => {
                 </select>
               </div>
               <div className="form-group">
-                <p style={{ color: '#666', fontSize: '14px' }}>
+                <p className="muted">
                   🎯 <strong>Текущее значение:</strong> {settings.theme === 'light' ? 'Светлая тема' : settings.theme === 'dark' ? 'Тёмная тема' : 'Автоматическая тема'}
                 </p>
               </div>
@@ -214,8 +218,8 @@ export const SettingsPage = () => {
 
           {activeTab === 'backup' && (
             <div>
-              <h2 style={{ color: '#333', marginTop: 0 }}>💾 Резервные копии</h2>
-              <div className="form-group" style={{ marginTop: '16px' }}>
+              <h2 className="settings-section-title">💾 Резервные копии</h2>
+              <div className="form-group mt-16">
                 <label>
                   <input
                     type="checkbox"
@@ -236,13 +240,13 @@ export const SettingsPage = () => {
                   </select>
                 </div>
               )}
-              <div className="form-group" style={{ marginTop: '20px' }}>
-                <button className="btn-primary" style={{ width: '100%' }}>
+              <div className="form-group mt-20">
+                <button className="btn-primary full-width">
                   💾 Создать резервную копию сейчас
                 </button>
               </div>
               <div className="form-group">
-                <p style={{ color: '#666', fontSize: '14px' }}>
+                <p className="muted">
                   📌 <strong>Последняя резервная копия:</strong> 2024-01-20 14:30:45
                 </p>
               </div>
@@ -251,35 +255,33 @@ export const SettingsPage = () => {
 
           {activeTab === 'api' && (
             <div>
-              <h2 style={{ color: '#333', marginTop: 0 }}>🔌 API Интеграции</h2>
-              <div className="form-group" style={{ marginTop: '16px' }}>
+              <h2 className="settings-section-title">🔌 API Интеграции</h2>
+              <div className="form-group mt-16">
                 <label>API Ключ</label>
                 <input
                   type="password"
                   value="sk_live_51234567890abcdefghijk"
                   readOnly
-                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                  className="monospace"
                 />
               </div>
               <div className="form-group">
                 <button className="btn-primary">🔄 Генерировать новый ключ</button>
               </div>
-              <div className="form-group" style={{ marginTop: '20px' }}>
-                <p style={{ color: '#666', fontSize: '14px' }}>
-                  📖 <strong>Документация:</strong> <a href="#" style={{ color: '#1976d2' }}>Прочитать API документацию</a>
+              <div className="form-group mt-20">
+                <p className="muted">
+                  📖 <strong>Документация:</strong> <a href="#" className="link-accent">Прочитать API документацию</a>
                 </p>
               </div>
             </div>
           )}
 
-          <div style={{ marginTop: '20px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <div className="actions-row">
             <button className="btn-primary" onClick={handleSave}>
               💾 Сохранить
             </button>
             {saved && (
-              <span style={{ color: '#4caf50', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
-                ✓ Сохранено успешно
-              </span>
+              <span className="saved-badge">✓ Сохранено успешно</span>
             )}
           </div>
         </div>

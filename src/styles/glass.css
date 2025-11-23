@@ -1,0 +1,94 @@
+/* Glassmorphism theme tokens and utilities */
+
+/* Light theme glass */
+:root {
+  --glass-bg: var(--surface-primary);
+  --glass-border: var(--border-primary);
+  --glass-blur: 10px;
+  --glass-radius: 12px;
+  --glass-shadow: 0 6px 30px rgba(11,13,22,0.08);
+  --glass-radius-sm: 8px;
+}
+
+.glass {
+  background: var(--surface-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.05);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.05);
+  color: var(--text-primary);
+}
+
+/* Dark theme glass */
+.theme-dark .glass {
+  --glass-bg: rgba(17,24,39,0.45);
+  --glass-border: rgba(255,255,255,0.06);
+  --glass-shadow: 0 6px 30px rgba(0,0,0,0.3);
+  
+  background: rgba(17,24,39,0.45);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+/* Glass variants */
+.glass-sm { padding: 12px; border-radius: var(--glass-radius-sm); }
+.glass-md { padding: 18px; }
+.glass-lg { padding: 24px; }
+
+/* Make icons monochrome and minimal */
+.icon, svg {
+  color: currentColor !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+/* Tables: allow horizontal scroll only */
+.table-wrapper, .requests-table, .data-table, .location-table { 
+  overflow-x: auto; 
+  overflow-y: visible; 
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Tabs and menu - horizontal scroll for mobile */
+.dashboard-tabs, .filters-bar, .faq-categories, .menu-tabs {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar but keep functionality */
+.table-wrapper::-webkit-scrollbar,
+.dashboard-tabs::-webkit-scrollbar,
+.menu-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-track,
+.dashboard-tabs::-webkit-scrollbar-track,
+.menu-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb,
+.dashboard-tabs::-webkit-scrollbar-thumb,
+.menu-tabs::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.1);
+  border-radius: 2px;
+}
+
+.theme-dark .table-wrapper::-webkit-scrollbar-thumb,
+.theme-dark .dashboard-tabs::-webkit-scrollbar-thumb,
+.theme-dark .menu-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+}
+
+/* Improve mobile: horizontal scrolling only for tables */
+@media (max-width: 768px){
+  .table-wrapper, .requests-table, .menu-tabs { 
+    overflow-x: auto; 
+    -webkit-overflow-scrolling: touch; 
+  }
+  .page-container { padding-bottom: 60px; }
+}

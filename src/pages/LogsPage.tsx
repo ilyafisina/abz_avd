@@ -47,17 +47,6 @@ export const LogsPage = () => {
     return '📝';
   };
 
-  const getEntityColor = (entity: string): string => {
-    const colorMap: { [key: string]: string } = {
-      product: '#2196f3',
-      request: '#4caf50',
-      user: '#ff9800',
-      warehouse: '#9c27b0',
-      other: '#757575',
-    };
-    return colorMap[entity] || '#757575';
-  };
-
   if (loading) {
     return <div className="page-container"><div className="loading">Загрузка логов...</div></div>;
   }
@@ -135,26 +124,19 @@ export const LogsPage = () => {
             </thead>
             <tbody>
               {filteredLogs.map(log => (
-                <tr key={log.id} onClick={() => setSelectedLog(log)} style={{ cursor: 'pointer' }}>
+                <tr key={log.id} onClick={() => setSelectedLog(log)} className="clickable-row">
                   <td>{new Date(log.timestamp).toLocaleString('ru-RU')}</td>
                   <td>{log.userName}</td>
                   <td>
                     <span>{getActionIcon(log.action)} {log.action}</span>
                   </td>
                   <td>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      backgroundColor: getEntityColor(log.entityType),
-                      color: 'white',
-                      fontSize: '12px',
-                    }}>
-                      {log.entityType === 'product' ? 'Товар' : 
-                       log.entityType === 'request' ? 'Заявка' : 
-                       log.entityType === 'user' ? 'Пользователь' : 
-                       log.entityType === 'warehouse' ? 'Склад' : 'Другое'}
-                    </span>
+                      <span className={`entity-badge ${log.entityType || 'other'}`}>
+                        {log.entityType === 'product' ? 'Товар' : 
+                         log.entityType === 'request' ? 'Заявка' : 
+                         log.entityType === 'user' ? 'Пользователь' : 
+                         log.entityType === 'warehouse' ? 'Склад' : 'Другое'}
+                      </span>
                   </td>
                   <td>
                     <code>{log.entityId}</code>
@@ -178,8 +160,8 @@ export const LogsPage = () => {
               <h2>📋 Детали логирования</h2>
               <button onClick={() => setSelectedLog(null)} className="modal-close">✕</button>
             </div>
-            <div className="modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="modal-body">
+              <div className="grid-2">
                 <div>
                   <p><strong>ID:</strong> {selectedLog.id}</p>
                   <p><strong>Пользователь:</strong> {selectedLog.userName}</p>
@@ -194,16 +176,9 @@ export const LogsPage = () => {
                 </div>
               </div>
               {selectedLog.changes && Object.keys(selectedLog.changes).length > 0 && (
-                <div style={{ marginTop: '16px' }}>
+                <div className="mt-16">
                   <p><strong>Изменения:</strong></p>
-                  <pre style={{
-                    backgroundColor: '#f5f5f5',
-                    padding: '12px',
-                    borderRadius: '4px',
-                    overflow: 'auto',
-                    maxHeight: '200px',
-                    fontSize: '12px'
-                  }}>
+                  <pre className="pre-block">
                     {JSON.stringify(selectedLog.changes, null, 2)}
                   </pre>
                 </div>

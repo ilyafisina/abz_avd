@@ -47,6 +47,38 @@
   color: #e74c3c;
 }
 
+.scanner-error {
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+.hidden-canvas { display: none; }
+
+.scanner-manual {
+  margin-top: 12px;
+  padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.scanner-manual .scanner-input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.scanner-manual .scanner-btn {
+  padding: 8px 12px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;

@@ -39,36 +39,36 @@ export const WarehousemanDashboard: React.FC = () => {
   return (
     <div className="dashboard warehouseman-dashboard">
       <h1>
-        <FiBox size={28} style={{ marginRight: '8px' }} />
+        <FiBox size={28} className="icon-inline" />
         Панель Складовщика
       </h1>
       <p className="subtitle">Управление товаром и просмотр заявок</p>
 
       {/* Dashboard Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon"><FiBox size={32} color="#0066cc" /></div>
+          <div className="stat-icon"><FiBox size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Всего товаров</p>
             <p className="stat-value">{products.length}</p>
           </div>
         </div>
         <div className="stat-card alert">
-          <div className="stat-icon"><FiAlertTriangle size={32} color="#f59e0b" /></div>
+          <div className="stat-icon"><FiAlertTriangle size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Низкие запасы</p>
             <p className="stat-value">{lowStockCount}</p>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon"><FiClipboard size={32} color="#06b6d4" /></div>
+          <div className="stat-icon"><FiClipboard size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Активные заявки</p>
             <p className="stat-value">{requests.filter(r => r.status === 'pending').length}</p>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon"><FiDollarSign size={32} color="#10b981" /></div>
+          <div className="stat-icon"><FiDollarSign size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Общая стоимость</p>
             <p className="stat-value">₽{(totalValue / 1000).toFixed(1)}k</p>
@@ -81,14 +81,14 @@ export const WarehousemanDashboard: React.FC = () => {
           className={`tab-btn ${activeTab === 'products' ? 'active' : ''}`}
           onClick={() => setActiveTab('products')}
         >
-          <FiBox size={18} style={{ marginRight: '6px' }} />
+          <FiBox size={18} className="icon-inline-small" />
           Товары
         </button>
         <button
           className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
           onClick={() => setActiveTab('requests')}
         >
-          <FiClipboard size={18} style={{ marginRight: '6px' }} />
+          <FiClipboard size={18} className="icon-inline-small" />
           Заявки
         </button>
       </div>

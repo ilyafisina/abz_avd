@@ -19,20 +19,11 @@ export const ProfilePage = () => {
     setIsEditing(false);
   };
 
-  const getRoleBadgeColor = (role?: string): string => {
-    switch(role) {
-      case 'admin': return '#d32f2f';
-      case 'manager': return '#1976d2';
-      case 'warehouseman': return '#f57c00';
-      default: return '#757575';
-    }
-  };
-
   const getRoleLabel = (role?: string): string => {
     switch(role) {
-      case 'admin': return '🔐 Администратор';
-      case 'manager': return '👔 Менеджер';
-      case 'warehouseman': return '📦 Складовщик';
+      case 'admin': return 'Администратор';
+      case 'manager': return 'Менеджер';
+      case 'warehouseman': return 'Складовщик';
       default: return 'Пользователь';
     }
   };
@@ -40,120 +31,100 @@ export const ProfilePage = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>👤 Профиль пользователя</h1>
+        <h1>Профиль</h1>
         <p>Управление личной информацией и параметрами учётной записи</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
-            <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
-              backgroundColor: getRoleBadgeColor(user?.role),
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '40px',
-              color: 'white'
-            }}>
-              👤
+      <div className="two-col-grid">
+        <div className="card-plain">
+          <div className="profile-header">
+            <div className={`avatar role-${user?.role || 'default'}`}>
+              {getInitials(user)}
             </div>
             <div>
-              <h2 style={{ margin: '0 0 8px 0' }}>{user?.username}</h2>
-              <span style={{
-                display: 'inline-block',
-                padding: '6px 12px',
-                borderRadius: '20px',
-                backgroundColor: getRoleBadgeColor(user?.role),
-                color: 'white',
-                fontSize: '12px',
-                fontWeight: 'bold'
-              }}>
+              <h2 className="no-margin">{user?.username}</h2>
+              <span className={`role-badge role-${user?.role || 'default'}`}>
                 {getRoleLabel(user?.role)}
               </span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="profile-meta">
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '12px' }}>Email</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{user?.email}</p>
+              <p className="muted-small">Email</p>
+              <p className="bold">{user?.email}</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '12px' }}>Дата создания</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>
-                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('ru-RU') : '—'}
-              </p>
+              <p className="muted-small">Дата создания</p>
+              <p className="bold">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('ru-RU') : '—'}</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '12px' }}>Статус</p>
-              <p style={{ margin: 0, fontWeight: 'bold', color: user?.isActive ? '#4caf50' : '#ff9800' }}>
-                {user?.isActive ? '✓ Активен' : '✗ Неактивен'}
+              <p className="muted-small">Статус</p>
+              <p className={`bold status-text ${user?.isActive ? 'active' : 'inactive'}`}>
+                {user?.isActive ? 'Активен' : 'Неактивен'}
               </p>
             </div>
           </div>
 
           {user?.role === 'warehouseman' && (
-            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-              <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '12px' }}>Зона склада</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{profileData.warehouseArea}</p>
+            <div className="mt-16 card-plain card-soft">
+              <p className="muted-small">Зона склада</p>
+              <p className="bold">{profileData.warehouseArea}</p>
             </div>
           )}
         </div>
 
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3 style={{ marginTop: 0 }}>📊 Статистика</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
-              <p style={{ margin: '0 0 4px 0', color: '#1976d2', fontSize: '12px', fontWeight: 'bold' }}>Последнее посещение</p>
-              <p style={{ margin: 0 }}>Сегодня в 14:32</p>
+        <div className="card-plain">
+          <h3 className="no-margin">Статистика</h3>
+          <div className="flex-col-gap">
+            <div className="stat-card info">
+              <p className="muted-small muted-info">Последнее посещение</p>
+              <p className="no-margin">Сегодня в 14:32</p>
             </div>
-            <div style={{ padding: '12px', backgroundColor: '#f3e5f5', borderRadius: '4px' }}>
-              <p style={{ margin: '0 0 4px 0', color: '#7b1fa2', fontSize: '12px', fontWeight: 'bold' }}>Привилегии</p>
-              <p style={{ margin: 0, fontSize: '14px' }}>
-                {user?.role === 'admin' ? '🔐 Полный доступ' : 
-                 user?.role === 'manager' ? '👔 Управление' :
-                 '📦 Просмотр и операции'}
+            <div className="stat-card purple">
+              <p className="muted-small muted-purple">Привилегии</p>
+              <p className="small-text">
+                {user?.role === 'admin' ? 'Полный доступ' : 
+                 user?.role === 'manager' ? 'Управление' :
+                 'Просмотр и операции'}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #eee' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0 }}>📋 Контактные данные</h3>
+        <div className="card-plain glass glass-lg glass-hover">
+        <div className="justify-space">
+          <h3 className="no-margin">Контактные данные</h3>
           <button
             onClick={() => setIsEditing(!isEditing)}
             className="btn-primary"
           >
-            {isEditing ? '✕ Отмена' : '✏️ Редактировать'}
+            {isEditing ? 'Отмена' : 'Редактировать'}
           </button>
         </div>
 
         {!isEditing ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div className="grid-2">
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '12px' }}>Имя</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{profileData.firstName || '—'}</p>
+              <p className="muted-small">Имя</p>
+              <p className="bold">{profileData.firstName || '—'}</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '12px' }}>Фамилия</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{profileData.lastName || '—'}</p>
+              <p className="muted-small">Фамилия</p>
+              <p className="bold">{profileData.lastName || '—'}</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '12px' }}>Телефон</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{profileData.phone}</p>
+              <p className="muted-small">Телефон</p>
+              <p className="bold">{profileData.phone}</p>
             </div>
             <div>
-              <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '12px' }}>Telegram</p>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{profileData.telegram}</p>
+              <p className="muted-small">Telegram</p>
+              <p className="bold">{profileData.telegram}</p>
             </div>
           </div>
         ) : (
-          <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="grid-2">
             <div className="form-group">
               <label>Имя</label>
               <input
@@ -186,17 +157,27 @@ export const ProfilePage = () => {
                 onChange={(e) => setProfileData({ ...profileData, telegram: e.target.value })}
               />
             </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <button type="submit" className="btn-primary">💾 Сохранить</button>
+            <div className="grid-full">
+              <button type="submit" className="btn-primary">Сохранить</button>
             </div>
           </form>
         )}
       </div>
 
-      <div style={{ marginTop: '20px', display: 'flex', gap: '8px' }}>
-        <button className="btn-primary">🔐 Изменить пароль</button>
-        <button className="btn-danger" onClick={logout}>🚪 Выход</button>
+      <div className="profile-actions">
+        <button className="btn-primary">Изменить пароль</button>
+        <button className="btn-danger" onClick={logout}>Выход</button>
       </div>
     </div>
   );
 };
+
+function getInitials(user: any) {
+  if (!user) return '';
+  const first = user.firstName || '';
+  const last = user.lastName || '';
+  const a = first.trim().charAt(0) || '';
+  const b = last.trim().charAt(0) || '';
+  const initials = (a + b).toUpperCase();
+  return initials || (user.username ? user.username.slice(0,2).toUpperCase() : '');
+}

@@ -1,0 +1,140 @@
+/* Theme variables and helper tokens */
+:root {
+  /* Цветовая палитра - СВЕТЛАЯ ТЕМА */
+  --primary-blue: #0066cc;
+  --primary-blue-light: #e6f0ff;
+  --primary-blue-dark: #0052a3;
+  --secondary-blue: #4d94ff;
+  --accent: linear-gradient(135deg,#0066cc 0%, #4d94ff 100%);
+  --surface-gradient: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(250,250,252,0.6));
+  --bg-gradient: linear-gradient(180deg,#f6f9ff 0%, #f3f6fb 100%);
+  
+  /* Цвета поверхностей и фонов */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafb;
+  --bg-tertiary: #f0f2f5;
+  --surface-primary: #ffffff;
+  --surface-secondary: #fafbfc;
+  --surface-tertiary: #f3f6fa;
+  
+  /* Текст и границы */
+  --text-primary: #1a1f2e;
+  --text-secondary: #5a6270;
+  --text-tertiary: #8b92a0;
+  --text-disabled: #c5cbd3;
+  --text-inverse: #ffffff;
+  
+  --neutral-white: #ffffff;
+  --neutral-light: #f8fafb;
+  --neutral-gray: #8b92a0;
+  --neutral-gray-light: #d5dce0;
+  --neutral-dark: #1a1f2e;
+  
+  --border-primary: #d5dce0;
+  --border-secondary: #e5ecf0;
+  --border-tertiary: #eff2f5;
+  
+  /* Статус-цвета - СВЕТЛАЯ ТЕМА */
+  --color-success: #4caf50;
+  --color-success-light: rgba(76, 175, 80, 0.12);
+  --color-error: #dc2626;
+  --color-error-light: rgba(220, 38, 38, 0.12);
+  --color-warning: #f59e0b;
+  --color-warning-light: rgba(245, 158, 11, 0.12);
+  --color-info: #1976d2;
+  --color-info-light: rgba(25, 118, 210, 0.12);
+  
+  /* Role цвета - СВЕТЛАЯ ТЕМА */
+  --role-admin-bg: #d32f2f;
+  --role-admin-light: rgba(211, 47, 47, 0.12);
+  --role-manager-bg: #1976d2;
+  --role-manager-light: rgba(25, 118, 210, 0.12);
+  --role-warehouseman-bg: #f57c00;
+  --role-warehouseman-light: rgba(245, 124, 0, 0.12);
+  --role-default-bg: #757575;
+  --role-default-light: rgba(117, 117, 117, 0.12);
+  
+  --radius: 10px;
+  --shadow-sm: 0 1px 3px rgba(26,31,46,0.06);
+  --shadow-md: 0 6px 18px rgba(26,31,46,0.08);
+  --shadow-lg: 0 20px 40px rgba(26,31,46,0.12);
+
+  /* Шрифты */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+
+  color-scheme: light;
+  color: var(--text-primary);
+  background: var(--bg-gradient);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark theme overrides */
+.theme-dark {
+  /* Цветовая палитра - ТЁМНАЯ ТЕМА */
+  --primary-blue: #66b3ff;
+  --primary-blue-light: rgba(102, 179, 255, 0.2);
+  --primary-blue-dark: #3d94ff;
+  --secondary-blue: #5eb3ff;
+  --accent: linear-gradient(135deg,#5eb3ff 0%, #3d94ff 100%);
+  --bg-gradient: linear-gradient(180deg,#0a0e17 0%, #0d1120 100%);
+  
+  /* Цвета поверхностей и фонов - ТЁМНАЯ */
+  --bg-primary: #0f1420;
+  --bg-secondary: #1a202d;
+  --bg-tertiary: #242f42;
+  --surface-primary: #111827;
+  --surface-secondary: #1a202d;
+  --surface-tertiary: #242f42;
+  
+  /* Текст и границы - ТЁМНАЯ */
+  --text-primary: #ffffff;
+  --text-secondary: #e0e0e0;
+  --text-tertiary: #b0b0b0;
+  --text-disabled: #808080;
+  --text-inverse: #1a1f2e;
+  
+  --neutral-white: #111827;
+  --neutral-light: #1a202d;
+  --neutral-gray: #9ca3af;
+  --neutral-gray-light: #3f4655;
+  --neutral-dark: #f3f4f6;
+  
+  --border-primary: #3f4655;
+  --border-secondary: #2f3d52;
+  --border-tertiary: #242f42;
+  
+  /* Статусы - ТЁМНАЯ ТЕМА */
+  --color-success: #90ee90;
+  --color-success-light: rgba(144, 238, 144, 0.2);
+  --color-error: #ff6b6b;
+  --color-error-light: rgba(255, 107, 107, 0.2);
+  --color-warning: #ffc966;
+  --color-warning-light: rgba(255, 201, 102, 0.2);
+  --color-info: #66b3ff;
+  --color-info-light: rgba(102, 179, 255, 0.2);
+  
+  /* Роли - ТЁМНАЯ ТЕМА */
+  --role-admin-bg: #ff6b6b;
+  --role-admin-light: rgba(255, 107, 107, 0.2);
+  --role-manager-bg: #66b3ff;
+  --role-manager-light: rgba(102, 179, 255, 0.2);
+  --role-warehouseman-bg: #ffb84d;
+  --role-warehouseman-light: rgba(255, 180, 77, 0.2);
+  --role-default-bg: #b0b0b0;
+  --role-default-light: rgba(176, 176, 176, 0.2);
+}
+
+/* Utility helpers */
+.u-row { display:flex; gap:12px; align-items:center; }
+.u-column { display:flex; flex-direction:column; gap:12px; }
+
+/* Small helpers for cards */
+.card { background: var(--surface-primary); border-radius: var(--radius); box-shadow: var(--shadow-md); border: 1px solid var(--border-primary); }

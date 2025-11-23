@@ -132,7 +132,7 @@ export const ProductsPage = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>📦 Управление товарами</h1>
+        <h1>Управление товарами</h1>
         <button
           className="btn-primary"
           onClick={() => {
@@ -184,13 +184,13 @@ export const ProductsPage = () => {
               </div>
               <div className="form-group">
                 <label>Штрихкод</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="input-row">
                   <input
                     type="text"
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                     placeholder="Штрихкод"
-                    style={{ flex: 1 }}
+                    className="flex-1"
                   />
                   <button
                     type="button"
@@ -288,7 +288,7 @@ export const ProductsPage = () => {
               </div>
             </div>
             {showScanner && (
-              <div style={{ marginBottom: '16px' }}>
+              <div className="mb-16">
                 <QRScanner
                   isActive={showScanner}
                   onScan={(data) => {

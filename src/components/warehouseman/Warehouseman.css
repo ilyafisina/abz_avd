@@ -1,19 +1,20 @@
 /* Warehouseman Dashboard Styles */
 .warehouseman-dashboard {
   padding: 0;
-  background-color: var(--neutral-light);
+  background: transparent;
   min-height: 100%;
   width: 100%;
+  color: var(--text-primary);
 }
 
 .tab-content {
   width: 100%;
   padding: 20px;
-  background-color: var(--neutral-light);
+  background-color: transparent;
 }
 
 .dashboard h1 {
-  color: var(--neutral-dark);
+  color: var(--text-primary);
   margin: 0 0 4px 0;
   font-size: 28px;
   font-weight: 700;
@@ -27,7 +28,7 @@
 }
 
 .dashboard .subtitle {
-  color: var(--neutral-gray);
+  color: var(--text-secondary);
   margin: 0 0 20px 0;
   font-size: 13px;
 }
@@ -36,8 +37,10 @@
   display: flex;
   gap: 8px;
   margin-bottom: 20px;
-  border-bottom: 2px solid var(--neutral-gray-light);
+  border-bottom: 1px solid var(--border-primary);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 24px;
 }
 
 .tab-btn {
@@ -46,15 +49,16 @@
   padding: 10px 20px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--neutral-gray);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
   border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
+  margin-bottom: -1px;
   white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .tab-btn svg {
@@ -65,7 +69,8 @@
 }
 
 .tab-btn:hover {
-  color: var(--neutral-dark);
+  color: var(--text-primary);
+  border-bottom-color: var(--primary-blue);
 }
 
 .tab-btn.active {
@@ -74,12 +79,13 @@
 }
 
 .section {
-  background: var(--neutral-white);
-  border-radius: 8px;
+  background: var(--surface-primary);
+  border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--neutral-gray-light);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
 }
 
 .section-header {
@@ -90,15 +96,15 @@
 }
 
 .section h2 {
-  color: var(--neutral-dark);
+  color: var(--text-primary);
   font-size: 18px;
   margin: 0;
   font-weight: 600;
 }
 
 .low-stock-badge {
-  background-color: var(--neutral-light);
-  color: var(--neutral-gray);
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
   padding: 6px 12px;
   border-radius: 4px;
   font-size: 11px;
@@ -106,8 +112,8 @@
 }
 
 .low-stock-badge.alert {
-  background-color: #fef2f2;
-  color: #dc2626;
+  background-color: var(--color-error-light);
+  color: var(--color-error);
 }
 
 .products-grid {
@@ -118,21 +124,22 @@
 }
 
 .product-card {
-  border: 1px solid var(--neutral-gray-light);
-  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
   padding: 12px;
-  background: var(--neutral-white);
-  transition: all 0.2s ease;
+  background: var(--surface-primary);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .product-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-color: var(--primary-blue);
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(77,148,255,0.12);
 }
 
 .product-card.low-stock {
-  border-left: 4px solid #f59e0b;
-  background-color: #fffbeb;
+  border-left: 4px solid var(--color-warning);
+  background-color: rgba(245, 158, 11, 0.1);
 }
 
 .product-header {
@@ -141,13 +148,13 @@
 
 .product-header h3 {
   margin: 0 0 4px 0;
-  color: var(--neutral-dark);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 600;
 }
 
 .sku {
-  color: var(--neutral-gray);
+  color: var(--text-secondary);
   font-size: 11px;
   font-family: 'Monaco', 'Courier New', monospace;
 }
@@ -167,12 +174,12 @@
 }
 
 .detail-row .label {
-  color: var(--neutral-gray);
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .detail-row .value {
-  color: var(--neutral-dark);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -193,13 +200,13 @@
 }
 
 .detail-row .price {
-  color: #06b6d4;
+  color: var(--primary-blue);
   font-weight: 700;
 }
 
 .warning {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
   padding: 8px;
   border-radius: 4px;
   font-size: 11px;
@@ -219,22 +226,22 @@
 }
 
 .requests-table thead {
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary);
 }
 
 .requests-table th {
   padding: 10px;
   text-align: left;
-  color: var(--neutral-dark);
+  color: var(--text-primary);
   font-weight: 600;
-  border-bottom: 1px solid var(--neutral-gray-light);
+  border-bottom: 1px solid var(--border-primary);
   white-space: nowrap;
 }
 
 .requests-table td {
   padding: 10px;
-  border-bottom: 1px solid var(--neutral-gray-light);
-  color: var(--neutral-dark);
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--text-primary);
 }
 
 .requests-table tbody tr:hover {
@@ -258,18 +265,18 @@
 }
 
 .status-pending {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
 }
 
 .status-approved {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: var(--color-success-light);
+  color: var(--color-success);
 }
 
 .status-rejected {
-  background-color: #fee2e2;
-  color: #7f1d1d;
+  background-color: var(--color-error-light);
+  color: var(--color-error);
 }
 
 .status-completed {
@@ -288,8 +295,8 @@
 }
 
 .priority-low {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: var(--color-success-light);
+  color: var(--color-success);
 }
 
 .priority-normal {
@@ -305,7 +312,7 @@
 .empty-state {
   text-align: center;
   padding: 30px;
-  color: var(--neutral-gray);
+  color: var(--text-secondary);
 }
 
 .empty-state p {

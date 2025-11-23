@@ -97,10 +97,6 @@ export const UsersPage = () => {
     return roleMap[role] || role;
   };
 
-  const getStatusColor = (isActive: boolean) => {
-    return isActive ? '#4caf50' : '#ff9800';
-  };
-
   if (loading) {
     return <div className="page-container"><div className="loading">Загрузка пользователей...</div></div>;
   }
@@ -245,14 +241,7 @@ export const UsersPage = () => {
                   <td>{user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : '-'}</td>
                   <td>{getRoleLabel(user.role)}</td>
                   <td>
-                    <span style={{
-                      display: 'inline-block',
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '50%',
-                      backgroundColor: getStatusColor(user.isActive),
-                      marginRight: '8px'
-                    }} />
+                    <span className={`status-dot ${user.isActive ? 'active' : 'inactive'}`} />
                     {user.isActive ? 'Активен' : 'Неактивен'}
                   </td>
                   <td>{new Date(user.createdAt).toLocaleDateString('ru-RU')}</td>
@@ -264,7 +253,7 @@ export const UsersPage = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '20px' }}>
+                <td colSpan={7} className="empty-cell">
                   Пользователи не найдены
                 </td>
               </tr>
