@@ -9,6 +9,7 @@ import { WarehousemanDashboard } from './components/warehouseman/WarehousemanDas
 import { ManagerDashboard } from './components/manager/ManagerDashboard';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ProductsPage } from './pages/ProductsPage';
+import { PrintProductsPage } from './pages/PrintProductsPage';
 import { RequestsPage } from './pages/RequestsPage';
 import { LocationsPage } from './pages/LocationsPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -40,6 +41,7 @@ const DashboardRouter = () => {
           }
         />
         <Route path="/products" element={<ProductsPage />} />
+        <Route path="/print-products" element={<PrintProductsPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/locations" element={<LocationsPage />} />
         <Route path="/reports" element={<ReportsPage />} />

@@ -58,6 +58,7 @@ export const RequestsPage = () => {
       requestType: 'transfer',
       products: [],
       status: 'pending',
+      warehouse: 'w1',
       createdBy: 'manager1',
     });
 

@@ -1,4 +1,29 @@
-import type { User, UserRole, Request, Product, SystemLog, AuthSession } from '../types';
+import type { User, UserRole, Request, Product, SystemLog, AuthSession, Warehouse } from '../types';
+
+// Mock данные для площадок
+export const mockWarehouses: Warehouse[] = [
+  {
+    id: 'zone-a',
+    name: 'Площадка А',
+    location: 'ул. Логистическая, д. 1, Москва',
+    managerId: '2',
+    createdAt: new Date('2024-01-01'),
+  },
+  {
+    id: 'zone-b',
+    name: 'Площадка Б',
+    location: 'ул. Промышленная, д. 42, СПб',
+    managerId: '3',
+    createdAt: new Date('2024-01-05'),
+  },
+  {
+    id: 'zone-c',
+    name: 'Площадка В',
+    location: 'ул. Торговая, д. 15, Казань',
+    managerId: '4',
+    createdAt: new Date('2024-01-10'),
+  },
+];
 
 // Mock данные для товаров
 export const mockProducts: Product[] = [
@@ -12,7 +37,7 @@ export const mockProducts: Product[] = [
     quantity: 150,
     minQuantity: 50,
     location: 'A1-001',
-    warehouse: 'Москва',
+    warehouse: 'zone-a', // Площадка А
     supplier: 'ООО АБЗ ВАД',
     price: 2500,
     lastUpdated: new Date(),
@@ -27,7 +52,7 @@ export const mockProducts: Product[] = [
     quantity: 300,
     minQuantity: 100,
     location: 'B1-002',
-    warehouse: 'Москва',
+    warehouse: 'zone-a', // Площадка А
     supplier: 'ООО Камень',
     price: 1200,
     lastUpdated: new Date(),
@@ -42,11 +67,56 @@ export const mockProducts: Product[] = [
     quantity: 45,
     minQuantity: 100,
     location: 'C1-003',
-    warehouse: 'Санкт-Петербург',
+    warehouse: 'zone-b', // Площадка Б
     supplier: 'ООО Песок Плюс',
     price: 800,
     lastUpdated: new Date(),
     createdAt: new Date('2024-01-10'),
+  },
+  {
+    id: '4',
+    name: 'Кровельные листы профилированные',
+    sku: 'ROOF-004',
+    barcode: '4601234567893',
+    category: 'кровельные материалы',
+    quantity: 120,
+    minQuantity: 40,
+    location: 'D1-004',
+    warehouse: 'zone-a', // Площадка А
+    supplier: 'ООО РоофСтрой',
+    price: 1800,
+    lastUpdated: new Date(),
+    createdAt: new Date('2024-01-12'),
+  },
+  {
+    id: '5',
+    name: 'Краска акриловая белая',
+    sku: 'PAINT-005',
+    barcode: '4601234567894',
+    category: 'краски и лаки',
+    quantity: 200,
+    minQuantity: 50,
+    location: 'E1-005',
+    warehouse: 'zone-b', // Площадка Б
+    supplier: 'ООО КрасКа',
+    price: 450,
+    lastUpdated: new Date(),
+    createdAt: new Date('2024-01-15'),
+  },
+  {
+    id: '6',
+    name: 'Цемент портландский М500',
+    sku: 'CEM-006',
+    barcode: '4601234567895',
+    category: 'вяжущие материалы',
+    quantity: 350,
+    minQuantity: 150,
+    location: 'F1-006',
+    warehouse: 'zone-c', // Площадка В
+    supplier: 'ООО ЦементЛюкс',
+    price: 600,
+    lastUpdated: new Date(),
+    createdAt: new Date('2024-01-18'),
   },
 ];
 
@@ -62,7 +132,7 @@ export const mockUsers: User[] = [
     isActive: true,
     createdAt: new Date('2024-01-01'),
     warehouseArea: 'Зона A',
-    warehouse: 'Москва',
+    warehouse: 'zone-a', // Привязан к Площадке А
   },
   {
     id: '2',
@@ -73,7 +143,7 @@ export const mockUsers: User[] = [
     lastName: 'Иванов',
     isActive: true,
     createdAt: new Date('2024-01-02'),
-    warehouse: 'Москва',
+    warehouse: 'zone-a', // Привязан к Площадке А
   },
   {
     id: '3',
@@ -84,6 +154,7 @@ export const mockUsers: User[] = [
     lastName: 'Смирнов',
     isActive: true,
     createdAt: new Date('2024-01-01'),
+    // Админ не привязан ни к одной площадке
   },
 ];
 
@@ -92,40 +163,56 @@ export const mockRequests: Request[] = [
   {
     id: '1',
     requestNumber: 'REQ-2024-001',
-    requestType: 'sale',
+    requestType: 'incoming',
     status: 'pending',
+    warehouse: 'zone-a',
     products: [
       {
         productId: '1',
         productName: 'Асфальтобетонная смесь АБЗ-1',
         quantity: 50,
-        currentQuantity: 150,
-        location: 'A1-001',
       },
     ],
-    createdBy: '2',
+    createdBy: '3',
     createdAt: new Date(),
     priority: 'high',
-    notes: 'Срочная поставка для объекта на ул. Ленина',
+    notes: 'Новое поступление товара',
   },
   {
     id: '2',
     requestNumber: 'REQ-2024-002',
-    requestType: 'purchase',
+    requestType: 'writeoff',
     status: 'approved',
+    warehouse: 'zone-a',
     products: [
       {
         productId: '2',
         productName: 'Щебень фракция 5-20',
         quantity: 100,
-        currentQuantity: 300,
-        location: 'B1-002',
       },
     ],
-    createdBy: '2',
+    createdBy: '3',
     createdAt: new Date(Date.now() - 86400000),
     approvedBy: '3',
     approvedAt: new Date(Date.now() - 43200000),
+    priority: 'normal',
+  },
+  {
+    id: '3',
+    requestNumber: 'REQ-2024-003',
+    requestType: 'transfer',
+    status: 'pending',
+    warehouse: 'zone-a',
+    transferWarehouse: 'zone-b',
+    products: [
+      {
+        productId: '1',
+        productName: 'Асфальтобетонная смесь АБЗ-1',
+        quantity: 30,
+      },
+    ],
+    createdBy: '3',
+    createdAt: new Date(Date.now() - 3600000),
     priority: 'normal',
   },
 ];
@@ -268,6 +355,11 @@ export const requestService = {
     return mockRequests.find(r => r.id === id);
   },
 
+  async getRequestsByWarehouse(warehouseId: string): Promise<Request[]> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return mockRequests.filter(r => r.warehouse === warehouseId);
+  },
+
   async createRequest(request: Omit<Request, 'id' | 'createdAt' | 'requestNumber'>): Promise<Request> {
     await new Promise(resolve => setTimeout(resolve, 300));
     const newRequest: Request = {
@@ -389,3 +481,52 @@ export const systemLogService = {
     return mockSystemLogs;
   },
 };
+
+// Сервис площадок (mock)
+export const warehouseService = {
+  async getWarehouses(): Promise<Warehouse[]> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return mockWarehouses;
+  },
+
+  async getWarehouseById(id: string): Promise<Warehouse | undefined> {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return mockWarehouses.find(w => w.id === id);
+  },
+
+  async getWarehouseName(id: string): Promise<string> {
+    const warehouse = mockWarehouses.find(w => w.id === id);
+    return warehouse?.name || 'Неизвестная площадка';
+  },
+
+  async createWarehouse(warehouse: Omit<Warehouse, 'id' | 'createdAt'>): Promise<Warehouse> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const newWarehouse: Warehouse = {
+      ...warehouse,
+      id: `w${mockWarehouses.length + 1}`,
+      createdAt: new Date(),
+    };
+    mockWarehouses.push(newWarehouse);
+    return newWarehouse;
+  },
+
+  async updateWarehouse(id: string, updates: Partial<Warehouse>): Promise<Warehouse | undefined> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const warehouse = mockWarehouses.find(w => w.id === id);
+    if (warehouse) {
+      Object.assign(warehouse, updates);
+    }
+    return warehouse;
+  },
+
+  async deleteWarehouse(id: string): Promise<boolean> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const index = mockWarehouses.findIndex(w => w.id === id);
+    if (index !== -1) {
+      mockWarehouses.splice(index, 1);
+      return true;
+    }
+    return false;
+  },
+};
+

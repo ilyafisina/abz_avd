@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: warehouse-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 228abc228
+      MYSQL_DATABASE: abz_vad_sklad_warehouse
+      TZ: 'UTC'
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - warehouse-network
+
+  warehouse-api:
+    build:
+      context: .
+      dockerfile: WarehouseAPI/Dockerfile
+    container_name: warehouse-api
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=abz_vad_sklad_warehouse;Uid=root;Pwd=228abc228;"
+      ASPNETCORE_ENVIRONMENT: Production
+    ports:
+      - "5000:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - warehouse-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  warehouse-network:
+    driver: bridge

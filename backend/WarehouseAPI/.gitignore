@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+bin/
+obj/
+.vs/
+.vscode/
+
+# NuGet
+*.nupkg
+.nuget/
+
+# Local settings
+appsettings.Development.json
+*.user
+
+# Visual Studio
+.vs/
+*.sln.iml
+Properties/launchSettings.json
+
+# Entity Framework
+Migrations/
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

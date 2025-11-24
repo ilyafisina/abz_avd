@@ -2,7 +2,7 @@
 export type UserRole = 'warehouseman' | 'manager' | 'admin';
 
 // Типы запросов
-export type RequestType = 'sale' | 'purchase' | 'transfer' | 'adjustment';
+export type RequestType = 'incoming' | 'writeoff' | 'transfer' | 'adjustment';
 export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'completed';
 export type Priority = 'low' | 'normal' | 'high';
 export type EntityType = 'product' | 'request' | 'user' | 'warehouse' | 'other';
@@ -19,6 +19,15 @@ export interface User {
   warehouse?: string; // площадка для менеджера и складовщика
   createdAt: Date;
   warehouseArea?: string; // для складовщиков - зона в складе
+}
+
+// Интерфейс площадки (склада)
+export interface Warehouse {
+  id: string;
+  name: string; // название площадки
+  location: string; // адрес
+  managerId?: string; // начальник площадки
+  createdAt: Date;
 }
 
 // Интерфейс товара
@@ -43,8 +52,10 @@ export interface Product {
 export interface Request {
   id: string;
   requestNumber: string;
-  requestType: RequestType;
+  requestType: RequestType; // incoming | writeoff | transfer
   status: RequestStatus;
+  warehouse: string; // площадка, к которой относится заявка
+  transferWarehouse?: string; // целевая площадка при перемещении
   products: RequestProduct[];
   createdBy: string;
   createdAt: Date;
@@ -61,8 +72,8 @@ export interface RequestProduct {
   productId: string;
   productName: string;
   quantity: number;
-  currentQuantity: number;
-  location: string;
+  currentQuantity?: number;
+  location?: string;
 }
 
 // Интерфейс логирования системы

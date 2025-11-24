@@ -135,6 +135,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                     <FiBox />
                     <span>Товары</span>
                   </a>
+                  <a href="/print-products" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <FiBox />
+                    <span>Печать этикеток</span>
+                  </a>
                   <a href="/requests" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
                     <FiClipboard />
                     <span>Заявки</span>

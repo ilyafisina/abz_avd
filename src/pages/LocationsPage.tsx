@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/useAuth';
 import type { Product } from '../types';
-import { productService } from '../services/mockService';
+import { productService, requestService } from '../services/mockService';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import './Pages.css';
@@ -42,6 +42,15 @@ export const LocationsPage = () => {
   const [searchLocation, setSearchLocation] = useState('');
   const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Форма перемещения товаров (для админа)
+  const [showTransferForm, setShowTransferForm] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    productId: '',
+    quantity: 0,
+    targetWarehouseId: '',
+    notes: '',
+  });
   
   // Фильтры товаров
   const [productFilters, setProductFilters] = useState({
@@ -202,6 +211,48 @@ export const LocationsPage = () => {
   };
 
   const pdfRef = useRef<HTMLDivElement>(null);
+
+  const handleTransfer = async () => {
+    if (!transferForm.productId || !transferForm.targetWarehouseId || transferForm.quantity <= 0) {
+      alert('Заполните все поля корректно');
+      return;
+    }
+
+    const product = products.find(p => p.id === transferForm.productId);
+    if (!product) {
+      alert('Товар не найден');
+      return;
+    }
+
+    if (product.quantity < transferForm.quantity) {
+      alert('Недостаточно товара на складе');
+      return;
+    }
+
+    try {
+      await requestService.createRequest({
+        requestType: 'transfer',
+        status: 'pending',
+        warehouse: selectedWarehouse || 'w1',
+        transferWarehouse: transferForm.targetWarehouseId,
+        products: [
+          {
+            productId: product.id,
+            productName: product.name,
+            quantity: transferForm.quantity,
+          },
+        ],
+        createdBy: user?.id || '3',
+        notes: transferForm.notes || 'Перемещение товара между площадками',
+      });
+      setShowTransferForm(false);
+      setTransferForm({ productId: '', quantity: 0, targetWarehouseId: '', notes: '' });
+      alert('Заявка на перемещение создана успешно');
+    } catch (error) {
+      console.error('Ошибка при создании заявки:', error);
+      alert('Не удалось создать заявку');
+    }
+  };
 
   const exportToPDF = async (warehouse: Warehouse) => {
     if (!pdfRef.current) return;
@@ -486,6 +537,141 @@ export const LocationsPage = () => {
             <p className="muted-small">Товаров не найдено</p>
           )}
         </div>
+
+        {/* Для администратора - форма перемещения товаров */}
+        {isAdmin && (
+          <div className="card-plain" style={{ marginTop: '20px' }}>
+            <h3 className="no-margin">Перемещение товаров между площадками</h3>
+            
+            <button
+              onClick={() => setShowTransferForm(!showTransferForm)}
+              style={{
+                marginTop: '16px',
+                padding: '10px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: 'var(--primary-blue)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                fontWeight: '500',
+              }}
+            >
+              {showTransferForm ? '✕ Отменить' : '+ Создать заявку на перемещение'}
+            </button>
+
+            {showTransferForm && (
+              <div style={{
+                marginTop: '16px',
+                padding: '16px',
+                backgroundColor: 'var(--surface-secondary)',
+                borderRadius: '8px',
+                border: '1px solid var(--border-primary)',
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Товар для перемещения</label>
+                    <select
+                      value={transferForm.productId}
+                      onChange={(e) => setTransferForm({ ...transferForm, productId: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <option value="">Выберите товар</option>
+                      {warehouseProducts.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (осталось: {p.quantity})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Количество</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={transferForm.quantity}
+                      onChange={(e) => setTransferForm({ ...transferForm, quantity: parseInt(e.target.value) || 0 })}
+                      placeholder="Введите количество"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>На какую площадку переместить</label>
+                    <select
+                      value={transferForm.targetWarehouseId}
+                      onChange={(e) => setTransferForm({ ...transferForm, targetWarehouseId: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <option value="">Выберите целевую площадку</option>
+                      {warehouses.filter(w => w.id !== selectedWarehouse).map(w => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} - {w.address}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Примечание (опционально)</label>
+                    <textarea
+                      value={transferForm.notes}
+                      onChange={(e) => setTransferForm({ ...transferForm, notes: e.target.value })}
+                      placeholder="Причина перемещения..."
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleTransfer}
+                  style={{
+                    marginTop: '16px',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'var(--primary-blue)',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                  }}
+                >
+                  Создать заявку на перемещение
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Для администратора - дополнительная информация */}
         {isAdmin && (
