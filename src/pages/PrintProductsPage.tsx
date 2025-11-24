@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Product, Warehouse } from '../types';
-import { productService, mockWarehouses } from '../services/mockService';
+import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/useAuth';
 import './Pages.css';
 
@@ -27,12 +27,12 @@ export const PrintProductsPage = () => {
   useEffect(() => {
     const loadProducts = async () => {
       setLoading(true);
-      const data = await productService.getProducts();
+      const data = await apiService.getProducts();
       
       let filtered = data;
       if (user && user.role !== 'admin' && user.warehouse) {
-        filtered = data.filter(p => p.warehouse === user.warehouse);
-        const warehouse = mockWarehouses.find(w => w.id === user.warehouse);
+        filtered = data.filter((p) => p.warehouse === user.warehouse);
+        const warehouse = await apiService.getWarehouseById(user.warehouse);
         setUserWarehouse(warehouse || null);
       }
       

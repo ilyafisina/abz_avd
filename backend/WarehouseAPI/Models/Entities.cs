@@ -1,5 +1,7 @@
 namespace WarehouseAPI.Models;
 
+using System.Text.Json.Serialization;
+
 public class Warehouse
 {
     public string Id { get; set; } = null!;
@@ -8,10 +10,15 @@ public class Warehouse
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public ICollection<User> Users { get; set; } = new List<User>();
+    [JsonIgnore]
     public ICollection<Product> Products { get; set; } = new List<Product>();
+    [JsonIgnore]
     public ICollection<Transfer> OutgoingTransfers { get; set; } = new List<Transfer>();
+    [JsonIgnore]
     public ICollection<Transfer> IncomingTransfers { get; set; } = new List<Transfer>();
+    [JsonIgnore]
     public ICollection<Request> Requests { get; set; } = new List<Request>();
 }
 
@@ -27,8 +34,11 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public Warehouse? WarehouseNavigation { get; set; }
+    [JsonIgnore]
     public ICollection<Transfer> CreatedTransfers { get; set; } = new List<Transfer>();
+    [JsonIgnore]
     public ICollection<TransferComment> Comments { get; set; } = new List<TransferComment>();
 }
 
@@ -40,6 +50,7 @@ public class Category
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public ICollection<Product> Products { get; set; } = new List<Product>();
 }
 
@@ -58,7 +69,9 @@ public class Product
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public Category Category { get; set; } = null!;
+    [JsonIgnore]
     public Warehouse? WarehouseNavigation { get; set; }
+    [JsonIgnore]
     public ICollection<TransferProduct> TransferProducts { get; set; } = new List<TransferProduct>();
 }
 
@@ -74,8 +87,11 @@ public class Transfer
     public DateTime? CompletedAt { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public User CreatedByUser { get; set; } = null!;
+    [JsonIgnore]
     public Warehouse FromWarehouseNavigation { get; set; } = null!;
+    [JsonIgnore]
     public Warehouse ToWarehouseNavigation { get; set; } = null!;
     public ICollection<TransferProduct> Products { get; set; } = new List<TransferProduct>();
     public ICollection<TransferComment> Comments { get; set; } = new List<TransferComment>();
@@ -91,6 +107,7 @@ public class TransferProduct
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public Transfer Transfer { get; set; } = null!;
     public Product Product { get; set; } = null!;
 }
@@ -104,7 +121,9 @@ public class TransferComment
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
+    [JsonIgnore]
     public Transfer Transfer { get; set; } = null!;
+    [JsonIgnore]
     public User User { get; set; } = null!;
 }
 
@@ -131,6 +150,8 @@ public class Request
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public Warehouse? WarehouseNavigation { get; set; }
+    [JsonIgnore]
     public Warehouse? TransferWarehouseNavigation { get; set; }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Product } from '../types';
-import { productService } from '../services/mockService';
+import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/useAuth';
 import { useWarehouseFilter } from '../hooks/useWarehouseFilter';
 import { QRScanner } from '../components/QRScanner';
@@ -34,7 +34,7 @@ export const ProductsPage = () => {
 
   useEffect(() => {
     const initLoad = async () => {
-      const data = await productService.getProducts();
+      const data = await apiService.getProducts();
       const filtered = filterByWarehouse(data);
       setProducts(filtered);
       setLoading(false);
@@ -74,13 +74,13 @@ export const ProductsPage = () => {
     }
 
     if (editingId) {
-      const updated = await productService.updateProduct(editingId, formData);
+      const updated = await apiService.updateProduct(editingId, formData);
       if (updated) {
         setProducts(products.map((p) => (p.id === editingId ? updated : p)));
       }
       setEditingId(null);
     } else {
-      const created = await productService.createProduct(formData);
+      const created = await apiService.createProduct(formData);
       setProducts([...products, created]);
     }
 
@@ -120,7 +120,7 @@ export const ProductsPage = () => {
 
   const handleDelete = async (id: string) => {
     if (confirm('Вы уверены, что хотите удалить этот товар?')) {
-      await productService.deleteProduct(id);
+      await apiService.deleteProduct(id);
       setProducts(products.filter((p) => p.id !== id));
     }
   };

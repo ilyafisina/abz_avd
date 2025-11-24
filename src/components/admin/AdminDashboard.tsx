@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { userService, loggingService, productService } from '../../services/mockService';
+import { apiService } from '../../services/apiService';
 import type { User, SystemLog, Product } from '../../types';
 import './Admin.css';
 
@@ -18,9 +18,9 @@ export const AdminDashboard: React.FC = () => {
     setIsLoading(true);
     try {
       const [usersData, logsData, productsData] = await Promise.all([
-        userService.getUsers(),
-        loggingService.getLogs(),
-        productService.getProducts(),
+        apiService.getUsers(),
+        apiService.getLogs(),
+        apiService.getProducts(),
       ]);
       setUsers(usersData);
       setLogs(logsData);

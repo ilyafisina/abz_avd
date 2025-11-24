@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Product, CategorySummary, Warehouse } from '../types';
-import { productService, mockWarehouses } from '../services/mockService';
+import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/useAuth';
 import './Pages.css';
 import jsPDF from 'jspdf';
@@ -16,7 +16,7 @@ export const ReportsPage = () => {
   useEffect(() => {
     const loadProducts = async () => {
       setLoading(true);
-      const data = await productService.getProducts();
+      const data = await apiService.getProducts();
       
       // Фильтруем по площадке пользователя
       let filtered = data;
@@ -25,7 +25,7 @@ export const ReportsPage = () => {
         filtered = data.filter(p => p.warehouse === user.warehouse);
         
         // Находим информацию о площадке пользователя
-        const warehouse = mockWarehouses.find(w => w.id === user.warehouse);
+        const warehouse = await apiService.getWarehouseById(user.warehouse);
         setUserWarehouse(warehouse || null);
       } else if (user?.role === 'admin') {
         // Админ видит все, но мы можем показать информацию о выбранной площадке

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { SystemLog } from '../types';
-import { systemLogService } from '../services/mockService';
+import { apiService } from '../services/apiService';
 import './Pages.css';
 
 export const LogsPage = () => {
@@ -13,7 +13,7 @@ export const LogsPage = () => {
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
-    const data = await systemLogService.getLogs();
+    const data = await apiService.getLogs();
     setLogs(data);
     setLoading(false);
   }, []);

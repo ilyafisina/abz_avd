@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FiBox, FiAlertTriangle, FiClipboard, FiDollarSign } from 'react-icons/fi';
-import { productService, requestService } from '../../services/mockService';
+import { apiService } from '../../services/apiService';
 import type { Product, Request } from '../../types';
 import './Manager.css';
 
@@ -19,8 +19,8 @@ export const ManagerDashboard: React.FC = () => {
     setIsLoading(true);
     try {
       const [productsData, requestsData] = await Promise.all([
-        productService.getProducts(),
-        requestService.getRequests(),
+        apiService.getProducts(),
+        apiService.getRequests(),
       ]);
       setProducts(productsData);
       setRequests(requestsData);

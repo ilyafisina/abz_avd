@@ -1,6 +1,6 @@
 import React, { useState, useEffect, type ReactNode } from 'react';
 import type { User, AuthSession } from '../types';
-import { authService } from '../services/mockService';
+import { apiService } from '../services/apiService';
 import { AuthContext, type AuthContextType } from './AuthContextType';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -36,7 +36,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (username: string, password: string) => {
-    const newSession = await authService.login(username, password);
+    const newSession = await apiService.login(username, password);
+    apiService.setToken(newSession.token);
     setSession(newSession);
     setUser(newSession.user);
     localStorage.setItem('authSession', JSON.stringify(newSession));
@@ -44,7 +45,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     try {
-      await authService.logout();
+      await apiService.logout();
       setUser(null);
       setSession(null);
       localStorage.removeItem('authSession');
@@ -61,17 +62,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     firstName?: string,
     lastName?: string
   ) => {
-    const newUser = await authService.register(
-      username,
-      email,
-      password,
-      role as Parameters<typeof authService.register>[3],
-      firstName,
-      lastName
-    );
-    // После регистрации можно автоматически залогинить пользователя
-    // или перенаправить на страницу входа
-    console.log('Пользователь зарегистрирован:', newUser);
+    // TODO: Добавить endpoint регистрации на backend
+    console.log('Регистрация:', { username, email, password, role, firstName, lastName });
   };
 
   const value: AuthContextType = {

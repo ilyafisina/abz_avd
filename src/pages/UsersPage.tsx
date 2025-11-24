@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { User } from '../types';
-import { userService } from '../services/mockService';
+import { apiService } from '../services/apiService';
 import './Pages.css';
 
 export const UsersPage = () => {
@@ -21,7 +21,7 @@ export const UsersPage = () => {
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
-    const data = await userService.getUsers();
+    const data = await apiService.getUsers();
     setUsers(data);
     setLoading(false);
   }, []);
@@ -48,7 +48,7 @@ export const UsersPage = () => {
     }
 
     if (editingId) {
-      const updated = await userService.updateUser(editingId, formData);
+      const updated = await apiService.updateUser(editingId, formData);
       if (updated) {
         setUsers(users.map(u => (u.id === editingId ? updated : u)));
       }
@@ -81,7 +81,7 @@ export const UsersPage = () => {
 
   const handleDelete = async (id: string) => {
     if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-      const deleted = await userService.deleteUser(id);
+      const deleted = await apiService.deleteUser(id);
       if (deleted) {
         setUsers(users.filter(u => u.id !== id));
       }

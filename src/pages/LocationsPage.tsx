@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/useAuth';
 import type { Product } from '../types';
-import { productService, requestService } from '../services/mockService';
+import { apiService } from '../services/apiService';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import './Pages.css';
@@ -138,7 +138,7 @@ export const LocationsPage = () => {
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
-    const data = await productService.getProducts();
+    const data = await apiService.getProducts();
     setProducts(data);
     setLoading(false);
   }, []);
@@ -230,10 +230,10 @@ export const LocationsPage = () => {
     }
 
     try {
-      await requestService.createRequest({
+      await apiService.createRequest({
         requestType: 'transfer',
         status: 'pending',
-        warehouse: selectedWarehouse || 'w1',
+        warehouse: selectedWarehouse || 'zone-a',
         transferWarehouse: transferForm.targetWarehouseId,
         products: [
           {
@@ -243,6 +243,7 @@ export const LocationsPage = () => {
           },
         ],
         createdBy: user?.id || '3',
+        priority: 'normal',
         notes: transferForm.notes || 'Перемещение товара между площадками',
       });
       setShowTransferForm(false);

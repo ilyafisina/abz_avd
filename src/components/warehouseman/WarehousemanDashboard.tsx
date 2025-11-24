@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { productService, requestService } from '../../services/mockService';
+import { apiService } from '../../services/apiService';
 import type { Product, Request } from '../../types';
 import {
   FiBox,
@@ -23,8 +23,8 @@ export const WarehousemanDashboard: React.FC = () => {
     setIsLoading(true);
     try {
       const [productsData, requestsData] = await Promise.all([
-        productService.getProducts(),
-        requestService.getRequests(),
+        apiService.getProducts(),
+        apiService.getRequests(),
       ]);
       setProducts(productsData);
       setRequests(requestsData.filter(r => r.status !== 'completed'));

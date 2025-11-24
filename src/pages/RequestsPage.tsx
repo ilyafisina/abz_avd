@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Request } from '../types';
-import { requestService } from '../services/mockService';
+import { apiService } from '../services/apiService';
 import './Pages.css';
 
 export const RequestsPage = () => {
@@ -20,7 +20,7 @@ export const RequestsPage = () => {
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
-    const data = await requestService.getRequests();
+    const data = await apiService.getRequests();
     setRequests(data);
     setLoading(false);
   }, []);
@@ -54,12 +54,13 @@ export const RequestsPage = () => {
       return;
     }
 
-    const newRequest = await requestService.createRequest({
+    const newRequest = await apiService.createRequest({
       requestType: 'transfer',
       products: [],
       status: 'pending',
-      warehouse: 'w1',
+      warehouse: 'zone-a',
       createdBy: 'manager1',
+      priority: 'normal',
     });
 
     setRequests([newRequest, ...requests]);
@@ -73,14 +74,14 @@ export const RequestsPage = () => {
   };
 
   const handleApprove = async (id: string) => {
-    const updated = await requestService.approveRequest(id, 'manager');
+    const updated = await apiService.updateRequestStatus(id, 'approved');
     if (updated) {
       setRequests(requests.map((r) => (r.requestNumber === id ? updated : r)));
     }
   };
 
   const handleReject = async (id: string) => {
-    const updated = await requestService.updateRequestStatus(id, 'rejected');
+    const updated = await apiService.updateRequestStatus(id, 'rejected');
     if (updated) {
       setRequests(requests.map((r) => (r.requestNumber === id ? updated : r)));
     }
