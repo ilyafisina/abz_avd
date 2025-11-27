@@ -1,23 +1,27 @@
 import { useState, useEffect } from 'react';
-import type { Product } from '../types';
+import type { Product, Warehouse } from '../types';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/useAuth';
-import { useWarehouseFilter } from '../hooks/useWarehouseFilter';
 import { QRScanner } from '../components/QRScanner';
+import { EditProductModal } from '../components/EditProductModal';
 import '../components/QRScanner.css';
 import './Pages.css';
 
 export const ProductsPage = () => {
   const { user } = useAuth();
-  const { filterByWarehouse } = useWarehouseFilter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterWarehouse, setFilterWarehouse] = useState<number | undefined>(user?.warehouseId);
   const [sortBy, setSortBy] = useState('name');
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
@@ -27,31 +31,63 @@ export const ProductsPage = () => {
     quantity: 0,
     minQuantity: 0,
     location: '',
-    warehouse: user?.warehouse || '',
+    warehouseId: user?.warehouseId || 1,
     price: 0,
     supplier: '',
   });
 
+  const isAdmin = user?.role === 'admin';
+
   useEffect(() => {
     const initLoad = async () => {
-      const data = await apiService.getProducts();
-      const filtered = filterByWarehouse(data);
-      setProducts(filtered);
-      setLoading(false);
+      try {
+        const [cats, warehousesData, productsData] = await Promise.all([
+          apiService.getCategories(),
+          apiService.getWarehouses(),
+          apiService.getProducts(),
+        ]);
+        
+        setCategories(cats);
+        setWarehouses(warehousesData);
+        
+        // Фильтруем товары по складу текущего пользователя
+        let filtered = productsData;
+        if (!isAdmin && user?.warehouseId) {
+          filtered = productsData.filter(p => p.warehouseId === user.warehouseId);
+        }
+        
+        setProducts(filtered);
+        setLoading(false);
+      } catch (error) {
+        console.error('Ошибка при загрузке данных:', error);
+        setLoading(false);
+      }
     };
     initLoad();
-  }, [filterByWarehouse]);
+  }, [isAdmin, user?.warehouseId]);
 
-  const categories = ['асфальтобетон', 'щебень', 'песок', 'битум'];
+  const getDisplayedProducts = () => {
+    let filtered = products;
+    
+    // Для админа - фильтруем по выбранному складу если выбран
+    if (isAdmin && filterWarehouse) {
+      filtered = filtered.filter(p => p.warehouseId === filterWarehouse);
+    }
+    
+    // Фильтруем по поиску
+    filtered = filtered.filter((p) => {
+      const matchSearch =
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.barcode && p.barcode.includes(searchTerm));
+      const matchCategory = filterCategory === 'all' || p.category === filterCategory;
+      return matchSearch && matchCategory;
+    });
+    
+    return filtered;
+  };
 
-  const filteredProducts = products.filter((p) => {
-    const matchSearch =
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.barcode && p.barcode.includes(searchTerm));
-    const matchCategory = filterCategory === 'all' || p.category === filterCategory;
-    return matchSearch && matchCategory;
-  });
+  const filteredProducts = getDisplayedProducts();
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     switch (sortBy) {
@@ -68,22 +104,56 @@ export const ProductsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.sku.trim()) {
-      alert('Заполните все поля!');
+    if (!formData.name.trim() || !formData.sku.trim() || !formData.barcode.trim()) {
+      alert('Заполните все обязательные поля (название, SKU, штрихкод)!');
       return;
     }
 
-    if (editingId) {
-      const updated = await apiService.updateProduct(editingId, formData);
-      if (updated) {
-        setProducts(products.map((p) => (p.id === editingId ? updated : p)));
-      }
-      setEditingId(null);
-    } else {
+    setIsSaving(true);
+    try {
       const created = await apiService.createProduct(formData);
-      setProducts([...products, created]);
+      if (created) {
+        setProducts([...products, created]);
+        alert('Товар успешно добавлен!');
+        resetForm();
+      } else {
+        alert('Ошибка при создании товара');
+      }
+    } catch (error) {
+      console.error('Ошибка при сохранении товара:', error);
+      alert('Не удалось сохранить товар');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (!editingProduct) return;
+    
+    if (!formData.name.trim() || !formData.sku.trim() || !formData.barcode.trim()) {
+      alert('Заполните все обязательные поля (название, SKU, штрихкод)!');
+      return;
     }
 
+    setIsSaving(true);
+    try {
+      const updated = await apiService.updateProduct(editingProduct.id, formData);
+      if (updated) {
+        setProducts(products.map((p) => (p.id === editingProduct.id ? updated : p)));
+        alert('Товар успешно обновлён!');
+        closeEditModal();
+      } else {
+        alert('Ошибка при обновлении товара');
+      }
+    } catch (error) {
+      console.error('Ошибка при обновлении товара:', error);
+      alert('Не удалось обновить товар');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const resetForm = () => {
     setFormData({
       name: '',
       sku: '',
@@ -93,14 +163,15 @@ export const ProductsPage = () => {
       quantity: 0,
       minQuantity: 0,
       location: '',
-      warehouse: user?.warehouse || '',
+      warehouseId: user?.warehouseId || 1,
       price: 0,
       supplier: '',
     });
-    setShowForm(false);
+    setShowAddForm(false);
   };
 
   const handleEdit = (product: Product) => {
+    setEditingProduct(product);
     setFormData({
       name: product.name,
       sku: product.sku,
@@ -109,20 +180,56 @@ export const ProductsPage = () => {
       category: product.category,
       quantity: product.quantity,
       minQuantity: product.minQuantity,
-      location: product.location,
-      warehouse: product.warehouse,
+      location: product.location || '',
+      warehouseId: product.warehouseId,
       price: product.price,
       supplier: product.supplier || '',
     });
-    setEditingId(product.id);
-    setShowForm(true);
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingProduct(null);
+    resetEditFormData();
+  };
+
+  const resetEditFormData = () => {
+    setFormData({
+      name: '',
+      sku: '',
+      barcode: '',
+      qrCode: '',
+      category: '',
+      quantity: 0,
+      minQuantity: 0,
+      location: '',
+      warehouseId: user?.warehouseId || 1,
+      price: 0,
+      supplier: '',
+    });
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Вы уверены, что хотите удалить этот товар?')) {
-      await apiService.deleteProduct(id);
-      setProducts(products.filter((p) => p.id !== id));
+    if (!confirm('Вы уверены, что хотите удалить этот товар?')) return;
+
+    try {
+      const deleted = await apiService.deleteProduct(id);
+      if (deleted) {
+        setProducts(products.filter((p) => p.id !== id));
+        alert('Товар успешно удалён!');
+      } else {
+        alert('Ошибка при удалении товара');
+      }
+    } catch (error) {
+      console.error('Ошибка при удалении товара:', error);
+      alert('Ошибка при удалении товара');
     }
+  };
+
+  const handleQRScanned = (qrCode: string) => {
+    setFormData({ ...formData, qrCode });
+    setShowScanner(false);
   };
 
   if (loading) {
@@ -136,136 +243,139 @@ export const ProductsPage = () => {
         <button
           className="btn-primary"
           onClick={() => {
-            setShowForm(!showForm);
-            setEditingId(null);
-            setFormData({
-              name: '',
-              sku: '',
-              barcode: '',
-              qrCode: '',
-              category: '',
-              quantity: 0,
-              minQuantity: 0,
-              location: '',
-              warehouse: user?.warehouse || '',
-              price: 0,
-              supplier: '',
-            });
+            if (showAddForm) {
+              resetForm();
+            } else {
+              setShowAddForm(true);
+            }
           }}
         >
-          {showForm ? 'Отмена' : '+ Добавить товар'}
+          {showAddForm ? 'Отмена' : '+ Добавить товар'}
         </button>
       </div>
 
-      {showForm && (
+      {showAddForm && (
         <div className="form-card">
-          <h2>{editingId ? 'Редактирование товара' : 'Новый товар'}</h2>
-          <form onSubmit={handleSubmit} className="product-form">
+          <h3>Добавить новый товар</h3>
+          <form onSubmit={handleSubmit}>
             <div className="form-grid">
               <div className="form-group">
-                <label>Название *</label>
+                <label>Название товара *</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Название товара"
+                  placeholder="Введите название"
                   required
                 />
               </div>
+
+              <div className="form-group">
+                <label>Категория *</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  required
+                >
+                  <option value="">Выберите категорию</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="form-group">
                 <label>SKU *</label>
                 <input
                   type="text"
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  placeholder="SKU"
+                  placeholder="Артикул"
                   required
                 />
               </div>
+
               <div className="form-group">
-                <label>Штрихкод</label>
-                <div className="input-row">
+                <label>Штрихкод *</label>
+                <input
+                  type="text"
+                  value={formData.barcode}
+                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                  placeholder="Штрихкод"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>QR Код</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="text"
-                    value={formData.barcode}
-                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    placeholder="Штрихкод"
-                    className="flex-1"
+                    value={formData.qrCode}
+                    onChange={(e) => setFormData({ ...formData, qrCode: e.target.value })}
+                    placeholder="QR код (опционально)"
                   />
                   <button
                     type="button"
-                    className="btn-small btn-primary"
                     onClick={() => setShowScanner(!showScanner)}
-                    title="Сканировать QR/штрихкод"
+                    className="btn-secondary"
                   >
-                    📱
+                    {showScanner ? 'Скрыть' : 'Сканер'}
                   </button>
                 </div>
+                {showScanner && (
+                  <QRScanner isActive={showScanner} onScan={handleQRScanned} />
+                )}
               </div>
+
               <div className="form-group">
-                <label>QR код</label>
-                <input
-                  type="text"
-                  value={formData.qrCode}
-                  onChange={(e) => setFormData({ ...formData, qrCode: e.target.value })}
-                  placeholder="QR код"
-                />
-              </div>
-              <div className="form-group">
-                <label>Категория</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                >
-                  <option value="">Выберите категорию</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Количество</label>
+                <label>Цена (₽) *</label>
                 <input
                   type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Количество *</label>
+                <input
+                  type="number"
+                  min="0"
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
                   placeholder="0"
-                  min="0"
+                  required
                 />
               </div>
+
               <div className="form-group">
-                <label>Мин. количество</label>
+                <label>Минимальный запас</label>
                 <input
                   type="number"
-                  value={formData.minQuantity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, minQuantity: parseInt(e.target.value) })
-                  }
-                  placeholder="0"
                   min="0"
+                  value={formData.minQuantity}
+                  onChange={(e) => setFormData({ ...formData, minQuantity: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
                 />
               </div>
+
               <div className="form-group">
                 <label>Местоположение</label>
                 <input
                   type="text"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="Локация на складе"
+                  placeholder="Полка/зона (опционально)"
                 />
               </div>
-              <div className="form-group">
-                <label>Площадка (склад)</label>
-                <input
-                  type="text"
-                  value={formData.warehouse}
-                  onChange={(e) => setFormData({ ...formData, warehouse: e.target.value })}
-                  placeholder="Название площадки"
-                  disabled={user?.role !== 'admin'}
-                />
-              </div>
+
               <div className="form-group">
                 <label>Поставщик</label>
                 <input
@@ -275,153 +385,164 @@ export const ProductsPage = () => {
                   placeholder="Название поставщика"
                 />
               </div>
-              <div className="form-group">
-                <label>Цена за единицу</label>
-                <input
-                  type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
+
+              {isAdmin && (
+                <div className="form-group">
+                  <label>Площадка *</label>
+                  <select
+                    value={formData.warehouseId}
+                    onChange={(e) => setFormData({ ...formData, warehouseId: parseInt(e.target.value) })}
+                    required
+                  >
+                    <option value="">Выберите площадку</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-            {showScanner && (
-              <div className="mb-16">
-                <QRScanner
-                  isActive={showScanner}
-                  onScan={(data) => {
-                    console.log('✓ QR Scanner: Получены данные:', data);
-                    setFormData((prevData) => {
-                      const newData = { ...prevData, barcode: data };
-                      console.log('✓ QR Scanner: Обновляем formData:', newData);
-                      return newData;
-                    });
-                    setTimeout(() => {
-                      console.log('✓ QR Scanner: Закрываем сканер');
-                      setShowScanner(false);
-                    }, 500);
-                  }}
-                />
-              </div>
-            )}
-            <div className="form-actions">
-              <button type="submit" className="btn-success">
-                {editingId ? 'Обновить' : 'Добавить'}
-              </button>
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
-                Отмена
-              </button>
-            </div>
+
+            <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '16px' }} disabled={isSaving}>
+              {isSaving ? 'Сохранение...' : 'Добавить товар'}
+            </button>
           </form>
         </div>
       )}
+
+      <EditProductModal
+        isOpen={showEditModal}
+        product={editingProduct}
+        formData={{
+          name: formData.name,
+          sku: formData.sku,
+          barcode: formData.barcode,
+          qrCode: formData.qrCode,
+          quantity: formData.quantity,
+          price: formData.price,
+          minQuantity: formData.minQuantity,
+          location: formData.location,
+        }}
+        onFormChange={(field, value) => {
+          setFormData({ ...formData, [field]: value });
+        }}
+        onSave={handleEditSave}
+        onClose={closeEditModal}
+        isLoading={isSaving}
+      />
 
       <div className="filters-bar">
         <input
           type="text"
           className="search-input"
-          placeholder="🔍 Поиск по названию или SKU..."
+          placeholder="Поиск товаров..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <select
-          className="filter-select"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
+        
+        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
           <option value="all">Все категории</option>
           {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
+            <option key={cat.id} value={cat.name}>
+              {cat.name}
             </option>
           ))}
         </select>
-        <select
-          className="filter-select"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-        >
+
+        {isAdmin && (
+          <select value={filterWarehouse || ''} onChange={(e) => setFilterWarehouse(e.target.value ? parseInt(e.target.value) : undefined)}>
+            <option value="">Все площадки</option>
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
           <option value="name">По названию</option>
           <option value="quantity">По количеству</option>
           <option value="price">По цене</option>
         </select>
       </div>
 
-      <div className="table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Название</th>
-              <th>SKU</th>
-              <th>Штрихкод</th>
-              <th>Категория</th>
-              <th>Кол-во</th>
-              <th>Место</th>
-              <th>Площадка</th>
-              <th>Цена</th>
-              <th>Статус</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedProducts.length > 0 ? (
-              sortedProducts.map((product) => (
-                <tr key={product.id} className={product.quantity < product.minQuantity ? 'low-stock' : ''}>
-                  <td className="product-name">{product.name}</td>
-                  <td className="sku">{product.sku}</td>
-                  <td className="barcode">{product.barcode || '—'}</td>
-                  <td>{product.category}</td>
-                  <td className="quantity">{product.quantity}</td>
-                  <td className="location">{product.location}</td>
-                  <td className="warehouse">{product.warehouse}</td>
-                  <td className="price">₽{product.price.toFixed(2)}</td>
-                  <td>
-                    <span
-                      className={`status-badge ${
-                        product.quantity < product.minQuantity ? 'alert' : 'ok'
-                      }`}
-                    >
-                      {product.quantity < product.minQuantity ? '⚠️ Низкий' : '✓ OK'}
-                    </span>
-                  </td>
-                  <td className="actions">
-                    <button className="btn-small btn-primary" onClick={() => handleEdit(product)}>
-                      Редакт.
-                    </button>
-                    <button className="btn-small btn-danger" onClick={() => handleDelete(product.id)}>
-                      Удалить
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
+      <div className="products-list">
+        {sortedProducts.length > 0 ? (
+          <table>
+            <thead>
               <tr>
-                <td colSpan={10} className="empty-cell">
-                  Товары не найдены
-                </td>
+                <th>Название</th>
+                <th>SKU</th>
+                <th>Категория</th>
+                <th>Количество</th>
+                <th>Цена</th>
+                <th>Статус</th>
+                {isAdmin && <th>Площадка</th>}
+                <th>Действия</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="page-stats">
-        <div className="stat-item">
-          <span className="stat-label">Всего товаров:</span>
-          <span className="stat-value">{sortedProducts.length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">На складе:</span>
-          <span className="stat-value">{sortedProducts.reduce((sum, p) => sum + p.quantity, 0)} ед.</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Общая стоимость:</span>
-          <span className="stat-value">
-            ₽{sortedProducts.reduce((sum, p) => sum + p.price * p.quantity, 0).toFixed(2)}
-          </span>
-        </div>
+            </thead>
+            <tbody>
+              {sortedProducts.map((product) => {
+                const isLowStock = product.quantity < product.minQuantity;
+                const warehouseName = warehouses.find(w => w.id === product.warehouseId)?.name || 'Неизвестно';
+                return (
+                  <tr key={product.id} className={isLowStock ? 'low-stock' : ''}>
+                    <td className="product-name">{product.name}</td>
+                    <td className="sku">{product.sku}</td>
+                    <td>{product.category}</td>
+                    <td className="quantity">{product.quantity}</td>
+                    <td className="price">₽{product.price.toFixed(2)}</td>
+                    <td>
+                      <span className={`status-badge ${isLowStock ? 'alert' : 'ok'}`}>
+                        {isLowStock ? 'Низкий' : 'ОК'}
+                      </span>
+                    </td>
+                    {isAdmin && <td className="warehouse">{warehouseName}</td>}
+                    <td style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="btn-small"
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          backgroundColor: 'var(--primary-blue)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ✏ Редакт.
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="btn-small"
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          backgroundColor: '#e74c3c',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🗑 Удал.
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div className="empty-state">
+            <p>Товары не найдены</p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -39,11 +39,10 @@ public class WarehouseContext : DbContext
             entity.Property(e => e.Email).HasMaxLength(255).IsRequired();
             entity.Property(e => e.PasswordHash).HasMaxLength(500).IsRequired();
             entity.Property(e => e.Role).HasMaxLength(50).IsRequired();
-            entity.Property(e => e.Warehouse).HasMaxLength(50);
             
-            entity.HasOne(e => e.WarehouseNavigation)
+            entity.HasOne(e => e.Warehouse)
                 .WithMany(w => w.Users)
-                .HasForeignKey(e => e.Warehouse)
+                .HasForeignKey(e => e.WarehouseId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .IsRequired(false);
 
@@ -80,16 +79,17 @@ public class WarehouseContext : DbContext
             entity.Property(e => e.Price).HasPrecision(10, 2);
             entity.Property(e => e.Barcode).HasMaxLength(100);
             entity.Property(e => e.QrCode).HasMaxLength(500);
-            entity.Property(e => e.Warehouse).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Location).HasMaxLength(255);
+            entity.Property(e => e.MinQuantity).HasDefaultValue(50);
 
             entity.HasOne(e => e.Category)
                 .WithMany(c => c.Products)
                 .HasForeignKey(e => e.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(e => e.WarehouseNavigation)
+            entity.HasOne(e => e.Warehouse)
                 .WithMany(w => w.Products)
-                .HasForeignKey(e => e.Warehouse)
+                .HasForeignKey(e => e.WarehouseId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired();
 
@@ -110,15 +110,15 @@ public class WarehouseContext : DbContext
                 .HasForeignKey(e => e.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(e => e.FromWarehouseNavigation)
+            entity.HasOne(e => e.FromWarehouse)
                 .WithMany(w => w.OutgoingTransfers)
-                .HasForeignKey(e => e.FromWarehouse)
+                .HasForeignKey(e => e.FromWarehouseId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired();
 
-            entity.HasOne(e => e.ToWarehouseNavigation)
+            entity.HasOne(e => e.ToWarehouse)
                 .WithMany(w => w.IncomingTransfers)
-                .HasForeignKey(e => e.ToWarehouse)
+                .HasForeignKey(e => e.ToWarehouseId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired();
 
@@ -179,20 +179,18 @@ public class WarehouseContext : DbContext
         modelBuilder.Entity<Request>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Warehouse).HasMaxLength(50).IsRequired();
-            entity.Property(e => e.TransferWarehouse).HasMaxLength(50);
             entity.Property(e => e.Status).HasMaxLength(50).IsRequired();
             entity.Property(e => e.Notes).HasMaxLength(1000);
 
-            entity.HasOne(e => e.WarehouseNavigation)
+            entity.HasOne(e => e.Warehouse)
                 .WithMany(w => w.Requests)
-                .HasForeignKey(e => e.Warehouse)
+                .HasForeignKey(e => e.WarehouseId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired();
 
-            entity.HasOne(e => e.TransferWarehouseNavigation)
+            entity.HasOne(e => e.TransferWarehouse)
                 .WithMany()
-                .HasForeignKey(e => e.TransferWarehouse)
+                .HasForeignKey(e => e.TransferWarehouseId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .IsRequired(false);
         });
@@ -205,9 +203,9 @@ public class WarehouseContext : DbContext
     {
         // Seed Warehouses
         modelBuilder.Entity<Warehouse>().HasData(
-            new Warehouse { Id = "zone-a", Name = "Площадка А", Location = "ул. Логистическая, д. 1, Москва" },
-            new Warehouse { Id = "zone-b", Name = "Площадка Б", Location = "ул. Промышленная, д. 42, СПб" },
-            new Warehouse { Id = "zone-c", Name = "Площадка В", Location = "ул. Торговая, д. 15, Казань" }
+            new Warehouse { Id = 1, Name = "Площадка А", Location = "ул. Логистическая, д. 1, Москва" },
+            new Warehouse { Id = 2, Name = "Площадка Б", Location = "ул. Промышленная, д. 42, СПб" },
+            new Warehouse { Id = 3, Name = "Площадка В", Location = "ул. Торговая, д. 15, Казань" }
         );
 
         // Seed Categories

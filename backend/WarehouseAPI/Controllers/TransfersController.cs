@@ -19,22 +19,22 @@ public class TransfersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Transfer>>> GetTransfers(
         [FromQuery] string? status = null,
-        [FromQuery] string? fromWarehouse = null,
-        [FromQuery] string? toWarehouse = null)
+        [FromQuery] int? fromWarehouse = null,
+        [FromQuery] int? toWarehouse = null)
     {
         var query = _context.Transfers
             .Include(t => t.CreatedByUser)
-            .Include(t => t.FromWarehouseNavigation)
-            .Include(t => t.ToWarehouseNavigation)
+            .Include(t => t.FromWarehouse)
+            .Include(t => t.ToWarehouse)
             .Include(t => t.Products)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(status))
             query = query.Where(t => t.Status == status);
-        if (!string.IsNullOrEmpty(fromWarehouse))
-            query = query.Where(t => t.FromWarehouse == fromWarehouse);
-        if (!string.IsNullOrEmpty(toWarehouse))
-            query = query.Where(t => t.ToWarehouse == toWarehouse);
+        if (fromWarehouse.HasValue)
+            query = query.Where(t => t.FromWarehouseId == fromWarehouse.Value);
+        if (toWarehouse.HasValue)
+            query = query.Where(t => t.ToWarehouseId == toWarehouse.Value);
 
         return await query.ToListAsync();
     }
@@ -44,8 +44,8 @@ public class TransfersController : ControllerBase
     {
         var transfer = await _context.Transfers
             .Include(t => t.CreatedByUser)
-            .Include(t => t.FromWarehouseNavigation)
-            .Include(t => t.ToWarehouseNavigation)
+            .Include(t => t.FromWarehouse)
+            .Include(t => t.ToWarehouse)
             .Include(t => t.Products)
             .ThenInclude(tp => tp.Product)
             .Include(t => t.Comments)
@@ -59,8 +59,16 @@ public class TransfersController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<Transfer>> CreateTransfer(Transfer transfer)
+    public async Task<ActionResult<Transfer>> CreateTransfer([FromBody] CreateTransferRequest request)
     {
+        var transfer = new Transfer
+        {
+            CreatedByUserId = request.CreatedByUserId,
+            FromWarehouseId = request.FromWarehouseId,
+            ToWarehouseId = request.ToWarehouseId,
+            Status = "pending"
+        };
+
         _context.Transfers.Add(transfer);
         await _context.SaveChangesAsync();
         return CreatedAtAction(nameof(GetTransfer), new { id = transfer.Id }, transfer);
@@ -126,4 +134,11 @@ public class TransfersController : ControllerBase
 public class StatusUpdate
 {
     public string Status { get; set; } = null!;
+}
+
+public class CreateTransferRequest
+{
+    public int CreatedByUserId { get; set; }
+    public int FromWarehouseId { get; set; }
+    public int ToWarehouseId { get; set; }
 }

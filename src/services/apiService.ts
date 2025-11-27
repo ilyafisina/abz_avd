@@ -56,42 +56,33 @@ class ApiService {
 
   async login(username: string, password: string): Promise<AuthSession> {
     try {
-      // Попытка логина к реальному API (будет добавлено позже)
-      // const response = await this.fetchApi<{ token: string; user: User }>('/auth/login', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ username, password }),
-      // });
-      // return {
-      //   user: response.user,
-      //   token: response.token,
-      //   expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      // };
+      const response = await this.fetchApi<any>('/users/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
 
-      // Для теста используем mock данные
-      const mockUsers = [
-        { id: 1, username: 'warehouseman1', role: 'warehouseman' as UserRole },
-        { id: 2, username: 'manager1', role: 'manager' as UserRole },
-        { id: 3, username: 'admin', role: 'admin' as UserRole },
-      ];
-
-      const user = mockUsers.find(u => u.username === username);
-      if (!user || password !== 'password') {
+      if (!response || !response.user) {
         throw new Error('Неверные учетные данные');
       }
 
+      const user: User = {
+        id: String(response.user.id),
+        username: response.user.username,
+        email: response.user.email,
+        role: response.user.role as UserRole,
+        firstName: response.user.firstName || response.user.username,
+        lastName: response.user.lastName || '',
+        isActive: response.user.isActive,
+        createdAt: new Date(response.user.createdAt),
+        warehouseId: response.user.warehouseId,
+      };
+
+      const token = response.token || `bearer_${response.user.id}`;
+      this.setToken(token);
+
       return {
-        user: {
-          id: String(user.id),
-          username: user.username,
-          email: `${user.username}@abzvad.com`,
-          role: user.role,
-          firstName: username === 'warehouseman1' ? 'Иван' : username === 'manager1' ? 'Сергей' : 'Алексей',
-          lastName: username === 'warehouseman1' ? 'Петров' : username === 'manager1' ? 'Иванов' : 'Смирнов',
-          isActive: true,
-          createdAt: new Date(),
-          warehouse: user.role === 'admin' ? undefined : 'zone-a',
-        },
-        token: `token_${user.id}_${Date.now()}`,
+        user,
+        token,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       };
     } catch (error) {
@@ -135,10 +126,28 @@ class ApiService {
     }
   }
 
+  async createWarehouse(data: { name: string; location: string }): Promise<Warehouse> {
+    const result = await this.fetchApi<any>('/warehouses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return {
+      id: result.id,
+      name: result.name,
+      location: result.location,
+      createdAt: new Date(result.createdAt),
+    };
+  }
+
+  private categoriesCache: any[] | null = null;
+
   // ==================== CATEGORIES ====================
 
   async getCategories() {
-    return this.fetchApi<any[]>('/categories');
+    if (this.categoriesCache) return this.categoriesCache;
+    const data = await this.fetchApi<any[]>('/categories');
+    this.categoriesCache = data;
+    return data;
   }
 
   async getCategoryById(id: number) {
@@ -174,18 +183,19 @@ class ApiService {
     }
 
     const data = await this.fetchApi<any[]>(endpoint);
+    const categories = await this.getCategories();
     return data.map((p: any) => ({
       id: String(p.id),
       name: p.name,
       sku: p.sku,
       barcode: p.barcode,
       qrCode: p.qrCode,
-      category: `${p.categoryId}`, // Будет использовано как ID категории
+      category: categories.find(c => c.id === p.categoryId)?.name || `ID:${p.categoryId}`,
       quantity: p.quantity,
-      minQuantity: 50,
-      location: '',
-      warehouse: p.warehouse,
-      supplier: '',
+      minQuantity: p.minQuantity || 50,
+      location: p.location || '',
+      warehouseId: p.warehouseId,
+      supplier: p.supplier || '',
       price: p.price,
       lastUpdated: new Date(p.updatedAt),
       createdAt: new Date(p.createdAt),
@@ -196,18 +206,19 @@ class ApiService {
     try {
       const data = await this.fetchApi<any>(`/products/${id}`);
       if (!data) return undefined;
+      const categories = await this.getCategories();
       return {
         id: String(data.id),
         name: data.name,
         sku: data.sku,
         barcode: data.barcode,
         qrCode: data.qrCode,
-        category: `${data.categoryId}`,
+        category: categories.find(c => c.id === data.categoryId)?.name || `ID:${data.categoryId}`,
         quantity: data.quantity,
-        minQuantity: 50,
-        location: '',
-        warehouse: data.warehouse,
-        supplier: '',
+        minQuantity: data.minQuantity || 50,
+        location: data.location || '',
+        warehouseId: data.warehouseId,
+        supplier: data.supplier || '',
         price: data.price,
         lastUpdated: new Date(data.updatedAt),
         createdAt: new Date(data.createdAt),
@@ -218,32 +229,46 @@ class ApiService {
   }
 
   async createProduct(product: Omit<Product, 'id' | 'createdAt' | 'lastUpdated'>): Promise<Product> {
+    // Получить категорию по имени или используя ID напрямую
+    let categoryId = parseInt(product.category);
+    if (isNaN(categoryId)) {
+      const categories = await this.getCategories();
+      const cat = categories.find(c => c.name === product.category);
+      if (!cat) {
+        throw new Error(`Категория "${product.category}" не найдена`);
+      }
+      categoryId = cat.id;
+    }
+
     const data = await this.fetchApi<any>('/products', {
       method: 'POST',
       body: JSON.stringify({
         name: product.name,
         sku: product.sku,
-        categoryId: parseInt(product.category),
+        categoryId: categoryId,
         price: product.price,
         quantity: product.quantity,
         barcode: product.barcode,
         qrCode: product.qrCode,
-        warehouse: product.warehouse,
+        warehouseId: product.warehouseId,
+        location: product.location || '',
+        minQuantity: product.minQuantity || 50,
       }),
     });
 
+    const categories = await this.getCategories();
     return {
       id: String(data.id),
       name: data.name,
       sku: data.sku,
       barcode: data.barcode,
       qrCode: data.qrCode,
-      category: `${data.categoryId}`,
+      category: categories.find(c => c.id === data.categoryId)?.name || `ID:${data.categoryId}`,
       quantity: data.quantity,
-      minQuantity: 50,
-      location: '',
-      warehouse: data.warehouse,
-      supplier: '',
+      minQuantity: data.minQuantity || 50,
+      location: data.location || '',
+      warehouseId: data.warehouseId,
+      supplier: data.supplier || '',
       price: data.price,
       lastUpdated: new Date(data.updatedAt),
       createdAt: new Date(data.createdAt),
@@ -251,37 +276,68 @@ class ApiService {
   }
 
   async updateProduct(id: string, updates: Partial<Product>): Promise<Product | undefined> {
-    const data = await this.fetchApi<any>(`/products/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
+    try {
+      // Получить категорию по имени если нужно
+      let categoryId: number | undefined;
+      if (updates.category) {
+        categoryId = parseInt(updates.category);
+        if (isNaN(categoryId)) {
+          const categories = await this.getCategories();
+          const cat = categories.find(c => c.name === updates.category);
+          if (cat) {
+            categoryId = cat.id;
+          }
+        }
+      }
+
+      const body: any = {
         name: updates.name,
         sku: updates.sku,
-        categoryId: updates.category ? parseInt(updates.category) : undefined,
         price: updates.price,
         quantity: updates.quantity,
         barcode: updates.barcode,
         qrCode: updates.qrCode,
-      }),
-    });
+        location: updates.location,
+        minQuantity: updates.minQuantity,
+        supplier: updates.supplier,
+        warehouseId: updates.warehouseId,
+      };
 
-    if (!data) return undefined;
+      if (categoryId) {
+        body.categoryId = categoryId;
+      }
 
-    return {
-      id: String(data.id),
-      name: data.name,
-      sku: data.sku,
-      barcode: data.barcode,
-      qrCode: data.qrCode,
-      category: `${data.categoryId}`,
-      quantity: data.quantity,
-      minQuantity: 50,
-      location: '',
-      warehouse: data.warehouse,
-      supplier: '',
-      price: data.price,
-      lastUpdated: new Date(data.updatedAt),
-      createdAt: new Date(data.createdAt),
-    };
+      const data = await this.fetchApi<any>(`/products/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+
+      if (!data) {
+        console.error('Ошибка при обновлении товара: нет данных в ответе');
+        return undefined;
+      }
+
+      const categories = await this.getCategories();
+      return {
+        id: String(data.id),
+        name: data.name,
+        sku: data.sku,
+        barcode: data.barcode,
+        qrCode: data.qrCode,
+        category: categories.find(c => c.id === data.categoryId)?.name || `ID:${data.categoryId}`,
+        quantity: data.quantity,
+        minQuantity: data.minQuantity || 50,
+        location: data.location || '',
+        warehouseId: data.warehouseId,
+        supplier: data.supplier || '',
+        price: data.price,
+        lastUpdated: new Date(data.updatedAt),
+        createdAt: new Date(data.createdAt),
+      };
+    } catch (error) {
+      console.error('Ошибка при обновлении товара:', error);
+      return undefined;
+    }
   }
 
   async deleteProduct(id: string): Promise<boolean> {
@@ -310,8 +366,8 @@ class ApiService {
       requestNumber: `REQ-${r.id}`,
       requestType: 'transfer',
       status: r.status,
-      warehouse: r.warehouse,
-      transferWarehouse: r.transferWarehouse,
+      warehouseId: r.warehouseId,
+      transferWarehouseId: r.transferWarehouseId,
       products: [],
       createdBy: String(r.userId),
       createdAt: new Date(r.createdAt),
@@ -329,8 +385,8 @@ class ApiService {
         requestNumber: `REQ-${data.id}`,
         requestType: 'transfer',
         status: data.status,
-        warehouse: data.warehouse,
-        transferWarehouse: data.transferWarehouse,
+        warehouseId: data.warehouseId,
+        transferWarehouseId: data.transferWarehouseId,
         products: [],
         createdBy: String(data.userId),
         createdAt: new Date(data.createdAt),
@@ -342,9 +398,9 @@ class ApiService {
     }
   }
 
-  async getRequestsByWarehouse(warehouseId: string): Promise<Request[]> {
+  async getRequestsByWarehouse(warehouseId: number): Promise<Request[]> {
     const allRequests = await this.getRequests();
-    return allRequests.filter(r => r.warehouse === warehouseId);
+    return allRequests.filter(r => r.warehouseId === warehouseId);
   }
 
   async createRequest(request: Omit<Request, 'id' | 'createdAt' | 'requestNumber'>): Promise<Request> {
@@ -353,8 +409,8 @@ class ApiService {
       body: JSON.stringify({
         userId: parseInt(request.createdBy),
         productId: request.products[0]?.productId || 1,
-        warehouse: request.warehouse,
-        transferWarehouse: request.transferWarehouse,
+        warehouseId: request.warehouseId,
+        transferWarehouseId: request.transferWarehouseId,
         quantity: request.products[0]?.quantity || 0,
         status: request.status,
         notes: request.notes,
@@ -366,8 +422,8 @@ class ApiService {
       requestNumber: `REQ-${data.id}`,
       requestType: request.requestType,
       status: data.status,
-      warehouse: data.warehouse,
-      transferWarehouse: data.transferWarehouse,
+      warehouseId: data.warehouseId,
+      transferWarehouseId: data.transferWarehouseId,
       products: request.products,
       createdBy: String(data.userId),
       createdAt: new Date(data.createdAt),
@@ -389,8 +445,8 @@ class ApiService {
       requestNumber: `REQ-${data.id}`,
       requestType: 'transfer',
       status: data.status,
-      warehouse: data.warehouse,
-      transferWarehouse: data.transferWarehouse,
+      warehouseId: data.warehouseId,
+      transferWarehouseId: data.transferWarehouseId,
       products: [],
       createdBy: String(data.userId),
       createdAt: new Date(data.createdAt),
@@ -479,7 +535,7 @@ class ApiService {
       lastName: u.lastName || '',
       isActive: u.isActive,
       createdAt: new Date(u.createdAt),
-      warehouse: u.warehouse,
+      warehouseId: u.warehouseId,
     }));
   }
 
@@ -496,9 +552,50 @@ class ApiService {
         lastName: data.lastName || '',
         isActive: data.isActive,
         createdAt: new Date(data.createdAt),
-        warehouse: data.warehouse,
+        warehouseId: data.warehouseId,
       };
     } catch {
+      return undefined;
+    }
+  }
+
+  async createUser(userData: {
+    username: string;
+    password: string;
+    email?: string;
+    role: 'admin' | 'manager' | 'warehouseman';
+    warehouseId?: number;
+  }): Promise<User | undefined> {
+    try {
+      const body = {
+        username: userData.username,
+        passwordHash: userData.password, // Backend ожидает passwordHash
+        email: userData.email || 'user@warehouse.local',
+        role: userData.role,
+        warehouseId: userData.warehouseId || null,
+        isActive: true,
+      };
+
+      const data = await this.fetchApi<any>('/users', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+
+      if (!data) return undefined;
+
+      return {
+        id: String(data.id),
+        username: data.username,
+        email: data.email,
+        role: data.role as UserRole,
+        firstName: data.firstName || data.username,
+        lastName: data.lastName || '',
+        isActive: data.isActive,
+        createdAt: new Date(data.createdAt),
+        warehouseId: data.warehouseId,
+      };
+    } catch (error) {
+      console.error('Ошибка при создании пользователя:', error);
       return undefined;
     }
   }
@@ -520,7 +617,7 @@ class ApiService {
       lastName: data.lastName || '',
       isActive: data.isActive,
       createdAt: new Date(data.createdAt),
-      warehouse: data.warehouse,
+      warehouseId: data.warehouseId,
     };
   }
 

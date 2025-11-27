@@ -1,6 +1,15 @@
 // Типы ролей пользователей
 export type UserRole = 'warehouseman' | 'manager' | 'admin';
 
+// Интерфейс категории
+export interface Category {
+  id: number;
+  name: string;
+  description?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 // Типы запросов
 export type RequestType = 'incoming' | 'writeoff' | 'transfer' | 'adjustment';
 export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'completed';
@@ -16,14 +25,15 @@ export interface User {
   firstName?: string;
   lastName?: string;
   isActive: boolean;
-  warehouse?: string; // площадка для менеджера и складовщика
+  warehouseId?: number; // ID площадки для менеджера и складовщика
+  warehouse?: Warehouse; // навигационное свойство
   createdAt: Date;
   warehouseArea?: string; // для складовщиков - зона в складе
 }
 
 // Интерфейс площадки (склада)
 export interface Warehouse {
-  id: string;
+  id: number;
   name: string; // название площадки
   location: string; // адрес
   managerId?: string; // начальник площадки
@@ -40,8 +50,9 @@ export interface Product {
   category: string;
   quantity: number;
   minQuantity: number;
-  location: string; // местоположение на складе
-  warehouse: string; // площадка (склад)
+  location?: string; // местоположение на складе
+  warehouseId: number; // ID площадки (склада)
+  warehouse?: Warehouse; // навигационное свойство
   supplier?: string;
   price: number;
   lastUpdated: Date;
@@ -54,8 +65,10 @@ export interface Request {
   requestNumber: string;
   requestType: RequestType; // incoming | writeoff | transfer
   status: RequestStatus;
-  warehouse: string; // площадка, к которой относится заявка
-  transferWarehouse?: string; // целевая площадка при перемещении
+  warehouseId: number; // ID площадки, к которой относится заявка
+  transferWarehouseId?: number; // целевая площадка при перемещении
+  warehouse?: Warehouse; // навигационное свойство
+  transferWarehouse?: Warehouse; // навигационное свойство для целевой площадки
   products: RequestProduct[];
   createdBy: string;
   createdAt: Date;

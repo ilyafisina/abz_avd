@@ -23,7 +23,7 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<Warehouse>> GetWarehouse(string id)
+    public async Task<ActionResult<Warehouse>> GetWarehouse(int id)
     {
         var warehouse = await _context.Warehouses.FindAsync(id);
         if (warehouse == null)
@@ -32,15 +32,18 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<Warehouse>> CreateWarehouse(Warehouse warehouse)
+    public async Task<ActionResult<Warehouse>> CreateWarehouse([FromBody] Warehouse warehouse)
     {
+        if (string.IsNullOrWhiteSpace(warehouse.Name) || string.IsNullOrWhiteSpace(warehouse.Location))
+            return BadRequest("Name and Location are required");
+
         _context.Warehouses.Add(warehouse);
         await _context.SaveChangesAsync();
         return CreatedAtAction(nameof(GetWarehouse), new { id = warehouse.Id }, warehouse);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateWarehouse(string id, Warehouse warehouse)
+    public async Task<IActionResult> UpdateWarehouse(int id, Warehouse warehouse)
     {
         if (id != warehouse.Id)
             return BadRequest();
@@ -60,7 +63,7 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteWarehouse(string id)
+    public async Task<IActionResult> DeleteWarehouse(int id)
     {
         var warehouse = await _context.Warehouses.FindAsync(id);
         if (warehouse == null)
@@ -71,7 +74,7 @@ public class WarehousesController : ControllerBase
         return NoContent();
     }
 
-    private bool WarehouseExists(string id)
+    private bool WarehouseExists(int id)
     {
         return _context.Warehouses.Any(e => e.Id == id);
     }

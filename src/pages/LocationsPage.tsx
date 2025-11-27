@@ -1,48 +1,28 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/useAuth';
-import type { Product } from '../types';
+import type { Product, Warehouse } from '../types';
+import type { Category } from '../types';
 import { apiService } from '../services/apiService';
+import { EditProductModal } from '../components/EditProductModal';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import './Pages.css';
 
-interface Warehouse {
-  id: string;
-  name: string;
-  address: string;
-  phone: string;
-  manager: string;
-  area: string;
-  capacity: number;
-  usedCapacity: number;
-}
-
-interface WarehouseUser {
-  id: string;
-  username: string;
-  role: string;
-  status: 'active' | 'inactive';
-  lastSeen: string;
-}
-
-interface Movement {
-  id: string;
-  product: string;
-  from: string;
-  to: string;
-  quantity: number;
-  date: string;
-  performer: string;
-}
-
 export const LocationsPage = () => {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchLocation, setSearchLocation] = useState('');
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<number | null>(null);
   
+  // Форма для добавления новой площадки (для админа)
+  const [showAddWarehouseForm, setShowAddWarehouseForm] = useState(false);
+  const [newWarehouseForm, setNewWarehouseForm] = useState({
+    name: '',
+    location: '',
+  });
+
   // Форма перемещения товаров (для админа)
   const [showTransferForm, setShowTransferForm] = useState(false);
   const [transferForm, setTransferForm] = useState({
@@ -51,138 +31,90 @@ export const LocationsPage = () => {
     targetWarehouseId: '',
     notes: '',
   });
+
+  // Форма редактирования товара
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editProductForm, setEditProductForm] = useState({
+    name: '',
+    sku: '',
+    barcode: '',
+    qrCode: '',
+    quantity: 0,
+    price: 0,
+    minQuantity: 10,
+    location: '',
+  });
+
+  // Форма добавления нового товара (для админа)
+  const [showAddProductForm, setShowAddProductForm] = useState(false);
+  const [addProductForm, setAddProductForm] = useState({
+    name: '',
+    category: '',
+    sku: '',
+    barcode: '',
+    qrCode: '',
+    quantity: 0,
+    price: 0,
+    minQuantity: 10,
+    location: '',
+  });
   
-  // Фильтры товаров
+  const [categories, setCategories] = useState<Category[]>([]);
   const [productFilters, setProductFilters] = useState({
-    status: 'all', // 'all', 'low', 'ok'
+    status: 'all',
     priceMin: '',
     priceMax: '',
-    quantity: '', // 'all', 'low', 'high'
+    quantity: 'all',
     searchProduct: '',
   });
 
-  // Моковые данные площадок
-  const warehouses: Warehouse[] = [
-    {
-      id: 'zone-a',
-      name: 'Площадка А',
-      address: 'ул. Логистическая, д. 1, Москва',
-      phone: '+7 (495) 123-45-67',
-      manager: 'Иван Петров',
-      area: 'Зона A',
-      capacity: 10000,
-      usedCapacity: 7500,
-    },
-    {
-      id: 'zone-b',
-      name: 'Площадка Б',
-      address: 'ул. Промышленная, д. 42, СПб',
-      phone: '+7 (812) 987-65-43',
-      manager: 'Мария Сидорова',
-      area: 'Зона B',
-      capacity: 8000,
-      usedCapacity: 5200,
-    },
-    {
-      id: 'zone-c',
-      name: 'Площадка В',
-      address: 'ул. Торговая, д. 15, Казань',
-      phone: '+7 (843) 555-22-11',
-      manager: 'Петр Иванов',
-      area: 'Зона C',
-      capacity: 6000,
-      usedCapacity: 3800,
-    },
-  ];
+  const pdfRef = useRef<HTMLDivElement>(null);
+  const isAdmin = user?.role === 'admin';
 
-  // Мок-данные пользователей площадок
-  const getWarehouseUsers = (warehouseId: string): WarehouseUser[] => {
-    const usersMap: Record<string, WarehouseUser[]> = {
-      'zone-a': [
-        { id: '1', username: 'Иван Петров', role: 'manager', status: 'active', lastSeen: '2025-11-23 14:32' },
-        { id: '2', username: 'Алексей Морозов', role: 'warehouseman', status: 'active', lastSeen: '2025-11-23 15:10' },
-        { id: '3', username: 'Сергей Ковалов', role: 'warehouseman', status: 'inactive', lastSeen: '2025-11-22 18:45' },
-      ],
-      'zone-b': [
-        { id: '4', username: 'Мария Сидорова', role: 'manager', status: 'active', lastSeen: '2025-11-23 14:20' },
-        { id: '5', username: 'Татьяна Волкова', role: 'warehouseman', status: 'active', lastSeen: '2025-11-23 16:05' },
-      ],
-      'zone-c': [
-        { id: '6', username: 'Петр Иванов', role: 'manager', status: 'active', lastSeen: '2025-11-23 13:50' },
-        { id: '7', username: 'Николай Сорокин', role: 'warehouseman', status: 'active', lastSeen: '2025-11-23 15:55' },
-        { id: '8', username: 'Владимир Чехов', role: 'warehouseman', status: 'inactive', lastSeen: '2025-11-21 10:20' },
-      ],
+  // Загрузка данных
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [productsData, warehousesData, categoriesData] = await Promise.all([
+          apiService.getProducts(),
+          apiService.getWarehouses(),
+          apiService.getCategories(),
+        ]);
+        setProducts(productsData);
+        setWarehouses(warehousesData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Ошибка при загрузке данных:', error);
+      } finally {
+        setLoading(false);
+      }
     };
-    return usersMap[warehouseId] || [];
-  };
-
-  // Мок-данные перемещений товаров
-  const getWarehouseMovements = (warehouseArea: string): Movement[] => {
-    const movementsMap: Record<string, Movement[]> = {
-      'Зона A': [
-        { id: 'm1', product: 'Кровельные листы', from: 'Зона A', to: 'Зона B', quantity: 50, date: '2025-11-23 10:15', performer: 'Алексей Морозов' },
-        { id: 'm2', product: 'Краска акриловая', from: 'Зона A', to: 'Зона C', quantity: 30, date: '2025-11-23 09:30', performer: 'Сергей Ковалов' },
-        { id: 'm3', product: 'Стеклоткань', from: 'Зона B', to: 'Зона A', quantity: 20, date: '2025-11-22 16:45', performer: 'Татьяна Волкова' },
-      ],
-      'Зона B': [
-        { id: 'm4', product: 'Щебень фракция 20-40', from: 'Зона B', to: 'Зона A', quantity: 100, date: '2025-11-23 08:20', performer: 'Татьяна Волкова' },
-        { id: 'm5', product: 'Песок строительный', from: 'Зона C', to: 'Зона B', quantity: 80, date: '2025-11-22 14:10', performer: 'Николай Сорокин' },
-      ],
-      'Зона C': [
-        { id: 'm6', product: 'Цемент портландский', from: 'Зона A', to: 'Зона C', quantity: 60, date: '2025-11-23 11:05', performer: 'Иван Петров' },
-        { id: 'm7', product: 'Металлическая арматура', from: 'Зона C', to: 'Зона B', quantity: 45, date: '2025-11-22 13:25', performer: 'Владимир Чехов' },
-      ],
-    };
-    return movementsMap[warehouseArea] || [];
-  };
-
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    const data = await apiService.getProducts();
-    setProducts(data);
-    setLoading(false);
+    loadData();
   }, []);
 
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
-
-  // Группировка по местоположениям
-  const locationMap = new Map<string, Product[]>();
-  products.forEach((product) => {
-    if (product.location) {
-      if (!locationMap.has(product.location)) {
-        locationMap.set(product.location, []);
-      }
-      locationMap.get(product.location)!.push(product);
-    }
-  });
-
-  const isAdmin = user?.role === 'admin';
-  const canEdit = isAdmin;
-
-  const getTotalValue = (products: Product[]) => {
-    return products.reduce((sum, p) => sum + p.price * p.quantity, 0);
+  const getTotalValue = (warehouseProducts: Product[]) => {
+    return warehouseProducts.reduce((sum, p) => sum + p.price * p.quantity, 0);
   };
 
-  const getTotalQuantity = (products: Product[]) => {
-    return products.reduce((sum, p) => sum + p.quantity, 0);
+  const getTotalQuantity = (warehouseProducts: Product[]) => {
+    return warehouseProducts.reduce((sum, p) => sum + p.quantity, 0);
   };
 
-  const getWarehouseProducts = (warehouseArea: string) => {
-    return locationMap.get(warehouseArea) || [];
+  const getWarehouseProducts = (warehouseId: number) => {
+    return products.filter(p => p.warehouseId === warehouseId);
   };
 
-  const filterWarehouseProducts = (products: Product[]) => {
-    return products.filter((product) => {
-      // Фильтр по статусу (низкий/ок)
+  const filterWarehouseProducts = (warehouseProducts: Product[]) => {
+    return warehouseProducts.filter((product) => {
       if (productFilters.status !== 'all') {
         const isLowStock = product.quantity < product.minQuantity;
         if (productFilters.status === 'low' && !isLowStock) return false;
         if (productFilters.status === 'ok' && isLowStock) return false;
       }
 
-      // Фильтр по цене
       if (productFilters.priceMin) {
         const min = parseFloat(productFilters.priceMin);
         if (product.price < min) return false;
@@ -192,13 +124,11 @@ export const LocationsPage = () => {
         if (product.price > max) return false;
       }
 
-      // Фильтр по количеству
       if (productFilters.quantity !== 'all') {
         if (productFilters.quantity === 'low' && product.quantity > 50) return false;
         if (productFilters.quantity === 'high' && product.quantity <= 50) return false;
       }
 
-      // Поиск по названию/SKU
       if (productFilters.searchProduct) {
         const search = productFilters.searchProduct.toLowerCase();
         const nameMatch = product.name.toLowerCase().includes(search);
@@ -210,7 +140,146 @@ export const LocationsPage = () => {
     });
   };
 
-  const pdfRef = useRef<HTMLDivElement>(null);
+  const handleAddWarehouse = async () => {
+    if (!newWarehouseForm.name || !newWarehouseForm.location) {
+      alert('Заполните все поля');
+      return;
+    }
+
+    try {
+      const newWarehouse = await apiService.createWarehouse({
+        name: newWarehouseForm.name,
+        location: newWarehouseForm.location,
+      });
+      setWarehouses([...warehouses, newWarehouse]);
+      setShowAddWarehouseForm(false);
+      setNewWarehouseForm({ name: '', location: '' });
+      alert('Площадка успешно добавлена');
+    } catch (error) {
+      console.error('Ошибка при добавлении площадки:', error);
+      alert('Не удалось добавить площадку');
+    }
+  };
+
+  const handleAddProduct = async () => {
+    if (!addProductForm.name || !addProductForm.category || !selectedWarehouse || !addProductForm.sku || !addProductForm.barcode) {
+      alert('Заполните все обязательные поля');
+      return;
+    }
+
+    if (addProductForm.quantity <= 0 || addProductForm.price <= 0) {
+      alert('Количество и цена должны быть больше нуля');
+      return;
+    }
+
+    try {
+      const newProduct = await apiService.createProduct({
+        name: addProductForm.name,
+        category: addProductForm.category,
+        price: addProductForm.price,
+        quantity: addProductForm.quantity,
+        warehouseId: selectedWarehouse,
+        sku: addProductForm.sku,
+        barcode: addProductForm.barcode,
+        qrCode: addProductForm.qrCode || `QR-${Date.now()}`,
+        minQuantity: addProductForm.minQuantity,
+        location: addProductForm.location || '',
+      });
+
+      if (newProduct) {
+        setProducts([...products, newProduct]);
+        setShowAddProductForm(false);
+        setAddProductForm({
+          name: '',
+          category: '',
+          sku: '',
+          barcode: '',
+          qrCode: '',
+          quantity: 0,
+          price: 0,
+          minQuantity: 10,
+          location: '',
+        });
+        alert('Товар успешно добавлен на площадку');
+      }
+    } catch (error) {
+      console.error('Ошибка при добавлении товара:', error);
+      alert('Не удалось добавить товар');
+    }
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setEditProductForm({
+      name: product.name,
+      sku: product.sku,
+      barcode: product.barcode || '',
+      qrCode: product.qrCode || '',
+      quantity: product.quantity,
+      price: product.price,
+      minQuantity: product.minQuantity,
+      location: product.location || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return;
+
+    if (!editProductForm.name || !editProductForm.sku || !editProductForm.barcode) {
+      alert('Заполните все обязательные поля');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const updated = await apiService.updateProduct(editingProduct.id, {
+        ...editingProduct,
+        ...editProductForm,
+      });
+
+      if (updated) {
+        setProducts(products.map(p => p.id === updated.id ? updated : p));
+        alert('Товар успешно обновлён');
+        closeEditModal();
+      }
+    } catch (error) {
+      console.error('Ошибка при обновлении товара:', error);
+      alert('Не удалось обновить товар');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingProduct(null);
+    setEditProductForm({
+      name: '',
+      sku: '',
+      barcode: '',
+      qrCode: '',
+      quantity: 0,
+      price: 0,
+      minQuantity: 10,
+      location: '',
+    });
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот товар?')) return;
+
+    try {
+      const deleted = await apiService.deleteProduct(productId);
+      if (deleted) {
+        setProducts(products.filter(p => p.id !== productId));
+        alert('Товар успешно удалён');
+      }
+    } catch (error) {
+      console.error('Ошибка при удалении товара:', error);
+      alert('Не удалось удалить товар');
+    }
+  };
 
   const handleTransfer = async () => {
     if (!transferForm.productId || !transferForm.targetWarehouseId || transferForm.quantity <= 0) {
@@ -233,8 +302,8 @@ export const LocationsPage = () => {
       await apiService.createRequest({
         requestType: 'transfer',
         status: 'pending',
-        warehouse: selectedWarehouse || 'zone-a',
-        transferWarehouse: transferForm.targetWarehouseId,
+        warehouseId: selectedWarehouse || 1,
+        transferWarehouseId: parseInt(transferForm.targetWarehouseId),
         products: [
           {
             productId: product.id,
@@ -302,7 +371,7 @@ export const LocationsPage = () => {
     const warehouse = warehouses.find(w => w.id === selectedWarehouse);
     if (!warehouse) return null;
 
-    const warehouseProducts = getWarehouseProducts(warehouse.area);
+    const warehouseProducts = getWarehouseProducts(selectedWarehouse);
 
     return (
       <div ref={pdfRef} className="page-container">
@@ -323,16 +392,7 @@ export const LocationsPage = () => {
           <div className="card-plain">
             <div className="justify-space">
               <h3 className="no-margin">Информация о площадке</h3>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {canEdit && (
-                  <button 
-                    onClick={() => setIsEditing(!isEditing)}
-                    className={isEditing ? 'btn-secondary' : 'btn-primary'}
-                    style={{ padding: '6px 12px', fontSize: '12px' }}
-                  >
-                    {isEditing ? 'Отмена' : 'Редактировать'}
-                  </button>
-                )}
+              {isAdmin && (
                 <button
                   onClick={() => exportToPDF(warehouse)}
                   className="btn-primary"
@@ -340,61 +400,27 @@ export const LocationsPage = () => {
                 >
                   Экспорт PDF
                 </button>
-              </div>
+              )}
             </div>
 
-            {!isEditing ? (
-              <div className="location-info">
-                <div className="info-row">
-                  <span className="label">Адрес:</span>
-                  <span className="value">{warehouse.address}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Телефон:</span>
-                  <span className="value">{warehouse.phone}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Ответственный:</span>
-                  <span className="value">{warehouse.manager}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Зона:</span>
-                  <span className="value">{warehouse.area}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">Емкость:</span>
-                  <span className="value">{warehouse.usedCapacity} / {warehouse.capacity} м³</span>
-                </div>
-                <div className="capacity-bar">
-                  <div 
-                    className="capacity-used"
-                    style={{ width: `${(warehouse.usedCapacity / warehouse.capacity) * 100}%` }}
-                  ></div>
-                </div>
+            <div className="location-info">
+              <div className="info-row">
+                <span className="label">ID:</span>
+                <span className="value">{warehouse.id}</span>
               </div>
-            ) : (
-              <form className="edit-form" style={{ marginTop: '16px' }}>
-                <div className="form-group">
-                  <label>Адрес</label>
-                  <input type="text" defaultValue={warehouse.address} />
-                </div>
-                <div className="form-group">
-                  <label>Телефон</label>
-                  <input type="tel" defaultValue={warehouse.phone} />
-                </div>
-                <div className="form-group">
-                  <label>Ответственный менеджер</label>
-                  <input type="text" defaultValue={warehouse.manager} />
-                </div>
-                <div className="form-group">
-                  <label>Максимальная емкость (м³)</label>
-                  <input type="number" defaultValue={warehouse.capacity} />
-                </div>
-                <button type="button" onClick={() => setIsEditing(false)} className="btn-primary" style={{ width: '100%' }}>
-                  Сохранить изменения
-                </button>
-              </form>
-            )}
+              <div className="info-row">
+                <span className="label">Название:</span>
+                <span className="value">{warehouse.name}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">Адрес:</span>
+                <span className="value">{warehouse.location}</span>
+              </div>
+              <div className="info-row">
+                <span className="label">Дата создания:</span>
+                <span className="value">{new Date(warehouse.createdAt).toLocaleDateString('ru-RU')}</span>
+              </div>
+            </div>
           </div>
 
           {/* Статистика */}
@@ -505,6 +531,7 @@ export const LocationsPage = () => {
                     <th>Кол-во</th>
                     <th>Цена</th>
                     <th>Статус</th>
+                    {isAdmin && <th>Действия</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -524,11 +551,45 @@ export const LocationsPage = () => {
                             {product.quantity < product.minQuantity ? 'Низкий' : 'OK'}
                           </span>
                         </td>
+                        {isAdmin && (
+                          <td style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => handleEditProduct(product)}
+                              className="btn-small"
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                backgroundColor: 'var(--primary-blue)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✏ Редакт.
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProduct(product.id)}
+                              className="btn-small"
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                backgroundColor: '#e74c3c',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              🗑 Удал.
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="muted-small" style={{ textAlign: 'center', padding: '16px' }}>Товары не найдены по выбранным фильтрам</td>
+                      <td colSpan={isAdmin ? 7 : 6} className="muted-small" style={{ textAlign: 'center', padding: '16px' }}>Товары не найдены по выбранным фильтрам</td>
                     </tr>
                   )}
                 </tbody>
@@ -628,7 +689,7 @@ export const LocationsPage = () => {
                       <option value="">Выберите целевую площадку</option>
                       {warehouses.filter(w => w.id !== selectedWarehouse).map(w => (
                         <option key={w.id} value={w.id}>
-                          {w.name} - {w.address}
+                          {w.name} - {w.location}
                         </option>
                       ))}
                     </select>
@@ -674,74 +735,241 @@ export const LocationsPage = () => {
           </div>
         )}
 
-        {/* Для администратора - дополнительная информация */}
+        {/* Для администратора - форма добавления нового товара */}
         {isAdmin && (
-          <>
-            <div className="card-plain" style={{ marginTop: '20px' }}>
-              <h3 className="no-margin">Пользователи площадки</h3>
-              <div className="users-table" style={{ marginTop: '16px' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Пользователь</th>
-                      <th>Роль</th>
-                      <th>Статус</th>
-                      <th>Последний раз видели</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getWarehouseUsers(selectedWarehouse!).map((warehouseUser) => (
-                      <tr key={warehouseUser.id}>
-                        <td><strong>{warehouseUser.username}</strong></td>
-                        <td>
-                          <span className={`role-badge role-${warehouseUser.role}`}>
-                            {warehouseUser.role === 'manager' ? 'Менеджер' : 'Складовщик'}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`status-badge ${warehouseUser.status === 'active' ? 'ok' : 'inactive'}`}>
-                            {warehouseUser.status === 'active' ? 'Активен' : 'Неактивен'}
-                          </span>
-                        </td>
-                        <td className="muted-small">{warehouseUser.lastSeen}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className="card-plain" style={{ marginTop: '20px' }}>
+            <h3 className="no-margin">Добавить новый товар на площадку</h3>
+            
+            <button
+              onClick={() => setShowAddProductForm(!showAddProductForm)}
+              style={{
+                marginTop: '16px',
+                padding: '10px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#4caf50',
+                color: '#ffffff',
+                cursor: 'pointer',
+                fontWeight: '500',
+              }}
+            >
+              {showAddProductForm ? '✕ Отменить' : '+ Добавить товар'}
+            </button>
 
-            <div className="card-plain" style={{ marginTop: '20px' }}>
-              <h3 className="no-margin">История перемещений товаров</h3>
-              <p className="muted-small" style={{ marginTop: '8px', marginBottom: '12px' }}>Перемещения товаров с этой площадки за последние 30 дней</p>
-              <div className="movements-table" style={{ marginTop: '16px' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Товар</th>
-                      <th>Из</th>
-                      <th>В</th>
-                      <th>Кол-во</th>
-                      <th>Дата и время</th>
-                      <th>Выполнил</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getWarehouseMovements(warehouse.area).map((movement) => (
-                      <tr key={movement.id}>
-                        <td><strong>{movement.product}</strong></td>
-                        <td className="muted-small">{movement.from}</td>
-                        <td className="muted-small">{movement.to}</td>
-                        <td><strong>{movement.quantity} ед.</strong></td>
-                        <td className="muted-small">{movement.date}</td>
-                        <td>{movement.performer}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {showAddProductForm && (
+              <div style={{
+                marginTop: '16px',
+                padding: '16px',
+                backgroundColor: 'var(--surface-secondary)',
+                borderRadius: '8px',
+                border: '1px solid var(--border-primary)',
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Название товара *</label>
+                    <input
+                      type="text"
+                      value={addProductForm.name}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, name: e.target.value })}
+                      placeholder="Введите название товара"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Категория *</label>
+                    <select
+                      value={addProductForm.category}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, category: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <option value="">Выберите категорию</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>SKU *</label>
+                    <input
+                      type="text"
+                      value={addProductForm.sku}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, sku: e.target.value })}
+                      placeholder="Артикул"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Штрихкод *</label>
+                    <input
+                      type="text"
+                      value={addProductForm.barcode}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, barcode: e.target.value })}
+                      placeholder="Штрихкод товара"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>QR Код</label>
+                    <input
+                      type="text"
+                      value={addProductForm.qrCode}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, qrCode: e.target.value })}
+                      placeholder="QR код (опционально)"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Цена (₽) *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={addProductForm.price}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, price: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Количество *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={addProductForm.quantity}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, quantity: parseInt(e.target.value) || 0 })}
+                      placeholder="Количество единиц"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Минимальный запас</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={addProductForm.minQuantity}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, minQuantity: parseInt(e.target.value) || 10 })}
+                      placeholder="Минимум для уведомления"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Местоположение</label>
+                    <input
+                      type="text"
+                      value={addProductForm.location}
+                      onChange={(e) => setAddProductForm({ ...addProductForm, location: e.target.value })}
+                      placeholder="Полка/зона (опционально)"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleAddProduct}
+                  style={{
+                    marginTop: '16px',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#4caf50',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                  }}
+                >
+                  Добавить товар на площадку
+                </button>
               </div>
-            </div>
-          </>
+            )}
+          </div>
+        )}
+
+        {/* Для администратора - модальное окно редактирования товара */}
+        {isAdmin && (
+          <EditProductModal
+            isOpen={showEditModal}
+            product={editingProduct}
+            formData={editProductForm}
+            onFormChange={(field, value) => {
+              setEditProductForm({ ...editProductForm, [field]: value });
+            }}
+            onSave={handleUpdateProduct}
+            onClose={closeEditModal}
+            isLoading={isSavingEdit}
+          />
         )}
       </div>
     );
@@ -755,11 +983,94 @@ export const LocationsPage = () => {
         <p>Информация о всех складских площадках и их товарах</p>
       </div>
 
+      {isAdmin && (
+        <div style={{ marginBottom: '20px' }}>
+          <button
+            onClick={() => setShowAddWarehouseForm(!showAddWarehouseForm)}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#4caf50',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontWeight: '500',
+            }}
+          >
+            {showAddWarehouseForm ? '✕ Отменить' : '+ Добавить новую площадку'}
+          </button>
+
+          {showAddWarehouseForm && (
+            <div style={{
+              marginTop: '16px',
+              padding: '16px',
+              backgroundColor: 'var(--surface-secondary)',
+              borderRadius: '8px',
+              border: '1px solid var(--border-primary)',
+              maxWidth: '500px',
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Название площадки *</label>
+                  <input
+                    type="text"
+                    value={newWarehouseForm.name}
+                    onChange={(e) => setNewWarehouseForm({ ...newWarehouseForm, name: e.target.value })}
+                    placeholder="Введите название площадки"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-primary)',
+                      backgroundColor: 'var(--surface-primary)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Адрес *</label>
+                  <input
+                    type="text"
+                    value={newWarehouseForm.location}
+                    onChange={(e) => setNewWarehouseForm({ ...newWarehouseForm, location: e.target.value })}
+                    placeholder="Введите адрес площадки"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-primary)',
+                      backgroundColor: 'var(--surface-primary)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={handleAddWarehouse}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#4caf50',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                  }}
+                >
+                  Добавить площадку
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="filters-bar">
         <input
           type="text"
           className="search-input"
-          placeholder="Поиск по названию площадки..."
+          placeholder="Поиск по названию или адресу..."
           value={searchLocation}
           onChange={(e) => setSearchLocation(e.target.value)}
         />
@@ -768,38 +1079,19 @@ export const LocationsPage = () => {
       <div className="warehouses-grid">
         {warehouses
           .filter(w => w.name.toLowerCase().includes(searchLocation.toLowerCase()) || 
-                       w.address.toLowerCase().includes(searchLocation.toLowerCase()))
+                       w.location.toLowerCase().includes(searchLocation.toLowerCase()))
           .map((warehouse) => {
-            const warehouseProducts = getWarehouseProducts(warehouse.area);
+            const warehouseProducts = getWarehouseProducts(warehouse.id);
             return (
               <div key={warehouse.id} className="warehouse-card">
                 <div className="warehouse-header">
                   <h3>{warehouse.name}</h3>
-                  <span className="area-badge">{warehouse.area}</span>
+                  <span className="area-badge">ID: {warehouse.id}</span>
                 </div>
 
                 <div className="warehouse-info">
-                  <p><strong>Адрес:</strong> {warehouse.address}</p>
-                  <p><strong>Телефон:</strong> {warehouse.phone}</p>
-                  <p><strong>Ответственный:</strong> {warehouse.manager}</p>
-                </div>
-
-                <div className="warehouse-capacity">
-                  <div className="capacity-label">
-                    <span>Использование емкости</span>
-                    <span className="capacity-percent">
-                      {((warehouse.usedCapacity / warehouse.capacity) * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="capacity-bar">
-                    <div 
-                      className="capacity-used"
-                      style={{ width: `${(warehouse.usedCapacity / warehouse.capacity) * 100}%` }}
-                    ></div>
-                  </div>
-                  <div className="capacity-text">
-                    {warehouse.usedCapacity} / {warehouse.capacity} м³
-                  </div>
+                  <p><strong>Адрес:</strong> {warehouse.location}</p>
+                  <p><strong>Дата создания:</strong> {new Date(warehouse.createdAt).toLocaleDateString('ru-RU')}</p>
                 </div>
 
                 <div className="warehouse-stats">

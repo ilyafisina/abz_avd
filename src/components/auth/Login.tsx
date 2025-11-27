@@ -59,7 +59,6 @@ export const Login: React.FC = () => {
               disabled={isLoading}
               required
             />
-            <small className="hint-text">Для тестирования используйте: password</small>
           </div>
 
           <button type="submit" className="btn btn-primary" disabled={isLoading}>

@@ -17,14 +17,14 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery] string? warehouse = null)
+    public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery] int? warehouse = null)
     {
         var query = _context.Products
             .Include(p => p.Category)
             .AsQueryable();
 
-        if (!string.IsNullOrEmpty(warehouse))
-            query = query.Where(p => p.Warehouse == warehouse);
+        if (warehouse.HasValue)
+            query = query.Where(p => p.WarehouseId == warehouse.Value);
 
         return await query.ToListAsync();
     }
@@ -52,9 +52,11 @@ public class ProductsController : ControllerBase
             CategoryId = request.CategoryId,
             Price = request.Price,
             Quantity = request.Quantity,
+            MinQuantity = request.MinQuantity,
             Barcode = request.Barcode,
             QrCode = request.QrCode,
-            Warehouse = request.Warehouse
+            Location = request.Location,
+            WarehouseId = request.WarehouseId
         };
 
         _context.Products.Add(product);
@@ -70,13 +72,16 @@ public class ProductsController : ControllerBase
         if (product == null)
             return NotFound();
 
-        product.Name = request.Name;
-        product.Sku = request.Sku;
-        product.CategoryId = request.CategoryId;
-        product.Price = request.Price;
-        product.Quantity = request.Quantity;
-        product.Barcode = request.Barcode;
-        product.QrCode = request.QrCode;
+        if (!string.IsNullOrEmpty(request.Name)) product.Name = request.Name;
+        if (!string.IsNullOrEmpty(request.Sku)) product.Sku = request.Sku;
+        if (request.CategoryId.HasValue) product.CategoryId = request.CategoryId.Value;
+        if (request.Price.HasValue) product.Price = request.Price.Value;
+        if (request.Quantity.HasValue) product.Quantity = request.Quantity.Value;
+        if (request.MinQuantity.HasValue) product.MinQuantity = request.MinQuantity.Value;
+        if (request.Barcode != null) product.Barcode = request.Barcode;
+        if (request.QrCode != null) product.QrCode = request.QrCode;
+        if (request.Location != null) product.Location = request.Location;
+        
         product.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -103,18 +108,22 @@ public class CreateProductRequest
     public int CategoryId { get; set; }
     public decimal Price { get; set; }
     public int Quantity { get; set; }
+    public int MinQuantity { get; set; } = 50;
     public string? Barcode { get; set; }
     public string? QrCode { get; set; }
-    public string Warehouse { get; set; } = null!;
+    public string? Location { get; set; }
+    public int WarehouseId { get; set; }
 }
 
 public class UpdateProductRequest
 {
-    public string Name { get; set; } = null!;
-    public string Sku { get; set; } = null!;
-    public int CategoryId { get; set; }
-    public decimal Price { get; set; }
-    public int Quantity { get; set; }
+    public string? Name { get; set; }
+    public string? Sku { get; set; }
+    public int? CategoryId { get; set; }
+    public decimal? Price { get; set; }
+    public int? Quantity { get; set; }
+    public int? MinQuantity { get; set; }
     public string? Barcode { get; set; }
     public string? QrCode { get; set; }
+    public string? Location { get; set; }
 }

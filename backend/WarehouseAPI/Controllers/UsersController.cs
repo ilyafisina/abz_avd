@@ -19,13 +19,13 @@ public class UsersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<User>>> GetUsers()
     {
-        return await _context.Users.Include(u => u.WarehouseNavigation).ToListAsync();
+        return await _context.Users.Include(u => u.Warehouse).ToListAsync();
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<User>> GetUser(int id)
+    public async Task<ActionResult<User?>> GetUser(int id)
     {
-        var user = await _context.Users.Include(u => u.WarehouseNavigation).FirstOrDefaultAsync(u => u.Id == id);
+        var user = await _context.Users.Include(u => u.Warehouse).FirstOrDefaultAsync(u => u.Id == id);
         if (user == null)
             return NotFound();
         return user;
@@ -34,11 +34,27 @@ public class UsersController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<object>> Login(LoginRequest request)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+        var user = await _context.Users.Include(u => u.Warehouse).FirstOrDefaultAsync(u => u.Username == request.Username);
         if (user == null || user.PasswordHash != HashPassword(request.Password))
             return Unauthorized();
 
-        return Ok(new { id = user.Id, username = user.Username, role = user.Role, warehouse = user.Warehouse });
+        return Ok(new 
+        { 
+            user = new
+            {
+                id = user.Id,
+                username = user.Username,
+                email = user.Email,
+                role = user.Role,
+                firstName = user.FirstName ?? user.Username,
+                lastName = user.LastName ?? "",
+                isActive = user.IsActive,
+                createdAt = user.CreatedAt,
+                warehouseId = user.WarehouseId,
+                warehouse = user.Warehouse != null ? new { id = user.Warehouse.Id, name = user.Warehouse.Name } : null
+            },
+            token = GenerateToken(user.Id, user.Username, user.Role)
+        });
     }
 
     [HttpPost]
@@ -91,6 +107,15 @@ public class UsersController : ControllerBase
     {
         // Для демонстрации используем простой хеш
         return System.Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password)));
+    }
+
+    private string GenerateToken(int userId, string username, string role)
+    {
+        // Простой токен для текущей реализации
+        // В продакшене нужно использовать JWT
+        return System.Convert.ToBase64String(
+            System.Text.Encoding.UTF8.GetBytes($"{userId}:{username}:{role}:{DateTime.UtcNow.Ticks}")
+        );
     }
 }
 

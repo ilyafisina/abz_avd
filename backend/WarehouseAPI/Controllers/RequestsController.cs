@@ -17,13 +17,13 @@ public class RequestsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Request>>> GetRequests([FromQuery] string? status = null, [FromQuery] string? warehouse = null)
+    public async Task<ActionResult<IEnumerable<Request>>> GetRequests([FromQuery] string? status = null, [FromQuery] int? warehouse = null)
     {
         var query = _context.Requests.AsQueryable();
         if (!string.IsNullOrEmpty(status))
             query = query.Where(r => r.Status == status);
-        if (!string.IsNullOrEmpty(warehouse))
-            query = query.Where(r => r.Warehouse == warehouse);
+        if (warehouse.HasValue)
+            query = query.Where(r => r.WarehouseId == warehouse.Value);
         return await query.ToListAsync();
     }
 

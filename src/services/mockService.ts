@@ -3,21 +3,21 @@ import type { User, UserRole, Request, Product, SystemLog, AuthSession, Warehous
 // Mock данные для площадок
 export const mockWarehouses: Warehouse[] = [
   {
-    id: 'zone-a',
+    id: 1,
     name: 'Площадка А',
     location: 'ул. Логистическая, д. 1, Москва',
     managerId: '2',
     createdAt: new Date('2024-01-01'),
   },
   {
-    id: 'zone-b',
+    id: 2,
     name: 'Площадка Б',
     location: 'ул. Промышленная, д. 42, СПб',
     managerId: '3',
     createdAt: new Date('2024-01-05'),
   },
   {
-    id: 'zone-c',
+    id: 3,
     name: 'Площадка В',
     location: 'ул. Торговая, д. 15, Казань',
     managerId: '4',
@@ -37,7 +37,7 @@ export const mockProducts: Product[] = [
     quantity: 150,
     minQuantity: 50,
     location: 'A1-001',
-    warehouse: 'zone-a', // Площадка А
+    warehouseId: 1, // Площадка А
     supplier: 'ООО АБЗ ВАД',
     price: 2500,
     lastUpdated: new Date(),
@@ -52,7 +52,7 @@ export const mockProducts: Product[] = [
     quantity: 300,
     minQuantity: 100,
     location: 'B1-002',
-    warehouse: 'zone-a', // Площадка А
+    warehouseId: 1, // Площадка А
     supplier: 'ООО Камень',
     price: 1200,
     lastUpdated: new Date(),
@@ -67,7 +67,7 @@ export const mockProducts: Product[] = [
     quantity: 45,
     minQuantity: 100,
     location: 'C1-003',
-    warehouse: 'zone-b', // Площадка Б
+    warehouseId: 2, // Площадка Б
     supplier: 'ООО Песок Плюс',
     price: 800,
     lastUpdated: new Date(),
@@ -82,7 +82,7 @@ export const mockProducts: Product[] = [
     quantity: 120,
     minQuantity: 40,
     location: 'D1-004',
-    warehouse: 'zone-a', // Площадка А
+    warehouseId: 1, // Площадка А
     supplier: 'ООО РоофСтрой',
     price: 1800,
     lastUpdated: new Date(),
@@ -97,7 +97,7 @@ export const mockProducts: Product[] = [
     quantity: 200,
     minQuantity: 50,
     location: 'E1-005',
-    warehouse: 'zone-b', // Площадка Б
+    warehouseId: 2, // Площадка Б
     supplier: 'ООО КрасКа',
     price: 450,
     lastUpdated: new Date(),
@@ -112,7 +112,7 @@ export const mockProducts: Product[] = [
     quantity: 350,
     minQuantity: 150,
     location: 'F1-006',
-    warehouse: 'zone-c', // Площадка В
+    warehouseId: 3, // Площадка В
     supplier: 'ООО ЦементЛюкс',
     price: 600,
     lastUpdated: new Date(),
@@ -132,7 +132,7 @@ export const mockUsers: User[] = [
     isActive: true,
     createdAt: new Date('2024-01-01'),
     warehouseArea: 'Зона A',
-    warehouse: 'zone-a', // Привязан к Площадке А
+    warehouseId: 1, // Привязан к Площадке А
   },
   {
     id: '2',
@@ -143,7 +143,7 @@ export const mockUsers: User[] = [
     lastName: 'Иванов',
     isActive: true,
     createdAt: new Date('2024-01-02'),
-    warehouse: 'zone-a', // Привязан к Площадке А
+    warehouseId: 1, // Привязан к Площадке А
   },
   {
     id: '3',
@@ -165,7 +165,7 @@ export const mockRequests: Request[] = [
     requestNumber: 'REQ-2024-001',
     requestType: 'incoming',
     status: 'pending',
-    warehouse: 'zone-a',
+    warehouseId: 1,
     products: [
       {
         productId: '1',
@@ -183,7 +183,7 @@ export const mockRequests: Request[] = [
     requestNumber: 'REQ-2024-002',
     requestType: 'writeoff',
     status: 'approved',
-    warehouse: 'zone-a',
+    warehouseId: 1,
     products: [
       {
         productId: '2',
@@ -202,8 +202,8 @@ export const mockRequests: Request[] = [
     requestNumber: 'REQ-2024-003',
     requestType: 'transfer',
     status: 'pending',
-    warehouse: 'zone-a',
-    transferWarehouse: 'zone-b',
+    warehouseId: 1,
+    transferWarehouseId: 2,
     products: [
       {
         productId: '1',
@@ -355,9 +355,9 @@ export const requestService = {
     return mockRequests.find(r => r.id === id);
   },
 
-  async getRequestsByWarehouse(warehouseId: string): Promise<Request[]> {
+  async getRequestsByWarehouse(warehouseId: number): Promise<Request[]> {
     await new Promise(resolve => setTimeout(resolve, 300));
-    return mockRequests.filter(r => r.warehouse === warehouseId);
+    return mockRequests.filter(r => r.warehouseId === warehouseId);
   },
 
   async createRequest(request: Omit<Request, 'id' | 'createdAt' | 'requestNumber'>): Promise<Request> {
@@ -489,12 +489,12 @@ export const warehouseService = {
     return mockWarehouses;
   },
 
-  async getWarehouseById(id: string): Promise<Warehouse | undefined> {
+  async getWarehouseById(id: number): Promise<Warehouse | undefined> {
     await new Promise(resolve => setTimeout(resolve, 200));
     return mockWarehouses.find(w => w.id === id);
   },
 
-  async getWarehouseName(id: string): Promise<string> {
+  async getWarehouseName(id: number): Promise<string> {
     const warehouse = mockWarehouses.find(w => w.id === id);
     return warehouse?.name || 'Неизвестная площадка';
   },
@@ -503,14 +503,14 @@ export const warehouseService = {
     await new Promise(resolve => setTimeout(resolve, 300));
     const newWarehouse: Warehouse = {
       ...warehouse,
-      id: `w${mockWarehouses.length + 1}`,
+      id: Math.max(...mockWarehouses.map(w => w.id), 0) + 1,
       createdAt: new Date(),
     };
     mockWarehouses.push(newWarehouse);
     return newWarehouse;
   },
 
-  async updateWarehouse(id: string, updates: Partial<Warehouse>): Promise<Warehouse | undefined> {
+  async updateWarehouse(id: number, updates: Partial<Warehouse>): Promise<Warehouse | undefined> {
     await new Promise(resolve => setTimeout(resolve, 300));
     const warehouse = mockWarehouses.find(w => w.id === id);
     if (warehouse) {
@@ -519,7 +519,7 @@ export const warehouseService = {
     return warehouse;
   },
 
-  async deleteWarehouse(id: string): Promise<boolean> {
+  async deleteWarehouse(id: number): Promise<boolean> {
     await new Promise(resolve => setTimeout(resolve, 300));
     const index = mockWarehouses.findIndex(w => w.id === id);
     if (index !== -1) {

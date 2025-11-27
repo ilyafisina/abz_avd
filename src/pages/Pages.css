@@ -1665,3 +1665,43 @@
   background-color: var(--surface-primary);
   box-shadow: 0 0 0 3px var(--primary-blue-light);
 }
+
+/* Small button variants */
+.btn-small {
+  padding: 6px 12px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-small.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-small.btn-primary:hover {
+  opacity: 0.9;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.btn-small.btn-success {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.btn-small.btn-success:hover {
+  background-color: #059669;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+}
+
+.btn-small.btn-danger {
+  background-color: var(--color-error);
+  color: white;
+}
+
+.btn-small.btn-danger:hover {
+  background-color: #dc2626;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.2);
+}
