@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/useAuth';
-import type { Product, Warehouse } from '../types';
+import type { Product, Warehouse, User } from '../types';
 import type { Category } from '../types';
 import { apiService } from '../services/apiService';
 import { EditProductModal } from '../components/EditProductModal';
@@ -12,9 +12,11 @@ export const LocationsPage = () => {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchLocation, setSearchLocation] = useState('');
   const [selectedWarehouse, setSelectedWarehouse] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'products' | 'users'>('products');
   
   // Форма для добавления новой площадки (для админа)
   const [showAddWarehouseForm, setShowAddWarehouseForm] = useState(false);
@@ -78,14 +80,16 @@ export const LocationsPage = () => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [productsData, warehousesData, categoriesData] = await Promise.all([
+        const [productsData, warehousesData, categoriesData, usersData] = await Promise.all([
           apiService.getProducts(),
           apiService.getWarehouses(),
           apiService.getCategories(),
+          apiService.getUsers(),
         ]);
         setProducts(productsData);
         setWarehouses(warehousesData);
         setCategories(categoriesData);
+        setUsers(usersData);
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);
       } finally {
@@ -443,7 +447,26 @@ export const LocationsPage = () => {
           </div>
         </div>
 
+        {/* Табы для переключения */}
+        {isAdmin && (
+          <div className="dashboard-tabs" style={{ marginTop: '24px', marginBottom: '20px' }}>
+            <button
+              className={`tab-btn ${activeTab === 'products' ? 'active' : ''}`}
+              onClick={() => setActiveTab('products')}
+            >
+              Товары ({warehouseProducts.length})
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
+              onClick={() => setActiveTab('users')}
+            >
+              Сотрудники ({users.filter(u => u.warehouseId === selectedWarehouse).length})
+            </button>
+          </div>
+        )}
+
         {/* Товары площадки */}
+        {activeTab === 'products' && (
         <div className="card-plain" style={{ marginTop: '20px' }}>
           <h3 className="no-margin">Товары и материалы</h3>
           
@@ -599,6 +622,7 @@ export const LocationsPage = () => {
             <p className="muted-small">Товаров не найдено</p>
           )}
         </div>
+        )}
 
         {/* Для администратора - форма перемещения товаров */}
         {isAdmin && (
@@ -617,7 +641,7 @@ export const LocationsPage = () => {
                 cursor: 'pointer',
                 fontWeight: '500',
               }}
-            >
+              >
               {showTransferForm ? '✕ Отменить' : '+ Создать заявку на перемещение'}
             </button>
 
@@ -954,6 +978,62 @@ export const LocationsPage = () => {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Раздел пользователей площадки (для администратора) */}
+        {activeTab === 'users' && isAdmin && (
+          <div className="card-plain">
+            <h3>Сотрудники площадки</h3>
+            {users.filter(u => u.warehouseId === selectedWarehouse).length > 0 ? (
+              <table style={{ width: '100%', marginTop: '16px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: '12px' }}>Логин</th>
+                    <th style={{ textAlign: 'left', padding: '12px' }}>Email</th>
+                    <th style={{ textAlign: 'left', padding: '12px' }}>Роль</th>
+                    <th style={{ textAlign: 'left', padding: '12px' }}>Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users
+                    .filter(u => u.warehouseId === selectedWarehouse)
+                    .map(u => (
+                      <tr key={u.id} style={{ borderTop: '1px solid var(--border-primary)' }}>
+                        <td style={{ padding: '12px' }}>{u.username}</td>
+                        <td style={{ padding: '12px' }}>{u.email}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: u.role === 'manager' ? '#e3f2fd' : u.role === 'admin' ? '#fff3e0' : '#e8f5e9',
+                            fontSize: '12px',
+                            fontWeight: '500'
+                          }}>
+                            {u.role === 'manager' ? 'Менеджер' : u.role === 'admin' ? 'Администратор' : 'Складовщик'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: u.isActive ? '#e8f5e9' : '#ffebee',
+                            fontSize: '12px',
+                            fontWeight: '500'
+                          }}>
+                            {u.isActive ? 'Активен' : 'Неактивен'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            ) : (
+              <p style={{ color: 'var(--text-secondary)', marginTop: '16px' }}>На этой площадке нет сотрудников</p>
+            )}
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '16px' }}>
+              Для добавления или изменения сотрудников перейдите в раздел <strong>"Пользователи"</strong> в администрации
+            </p>
           </div>
         )}
 

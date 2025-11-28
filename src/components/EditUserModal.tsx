@@ -10,6 +10,8 @@ interface EditUserModalProps {
     username: string;
     password?: string;
     email: string;
+    firstName?: string;
+    lastName?: string;
     role: 'admin' | 'manager' | 'warehouseman';
     warehouseId?: number | string;
   };
@@ -18,6 +20,7 @@ interface EditUserModalProps {
   onSave: () => Promise<void>;
   onClose: () => void;
   isLoading?: boolean;
+  userRole?: 'admin' | 'manager' | 'warehouseman';
 }
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({
@@ -29,8 +32,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   onClose,
   isLoading = false,
   isNew = false,
+  userRole = 'admin',
 }) => {
   if (!isOpen) return null;
+
+  const isManagerCreating = userRole === 'manager' && isNew;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +57,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             ✕
           </button>
         </div>
+
+        {isManagerCreating && (
+          <div style={{ padding: '0 16px', marginBottom: '12px', fontSize: '13px', color: '#666' }}>
+            Вы можете создавать пользователей только роли "Складовщик" для вашей площадки.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
@@ -93,22 +105,54 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             />
           </div>
 
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-group">
+              <label htmlFor="user-firstName">Имя</label>
+              <input
+                id="user-firstName"
+                type="text"
+                value={formData.firstName || ''}
+                onChange={(e) => onFormChange('firstName', e.target.value)}
+                placeholder="Введите имя"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="user-lastName">Фамилия</label>
+              <input
+                id="user-lastName"
+                type="text"
+                value={formData.lastName || ''}
+                onChange={(e) => onFormChange('lastName', e.target.value)}
+                placeholder="Введите фамилию"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
           <div className="form-group">
             <label htmlFor="user-role">Роль *</label>
             <select
               id="user-role"
               value={formData.role}
               onChange={(e) => onFormChange('role', e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || isManagerCreating}
               required
             >
-              <option value="admin">Администратор</option>
-              <option value="manager">Менеджер</option>
-              <option value="warehouseman">Складовщик</option>
+              {isManagerCreating ? (
+                <option value="warehouseman">Складовщик</option>
+              ) : (
+                <>
+                  <option value="admin">Администратор</option>
+                  <option value="manager">Менеджер</option>
+                  <option value="warehouseman">Складовщик</option>
+                </>
+              )}
             </select>
           </div>
 
-          {formData.role !== 'admin' && (
+          {formData.role !== 'admin' && userRole !== 'manager' && (
             <div className="form-group">
               <label htmlFor="user-warehouse">
                 {formData.role === 'manager' ? 'Основная площадка' : 'Площадка'} *

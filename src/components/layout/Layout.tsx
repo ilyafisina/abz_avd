@@ -174,6 +174,16 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 </div>
               )}
 
+              {user?.role === 'manager' && (
+                <div className="nav-section">
+                  <h3>Управление</h3>
+                  <a href="/users" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <FiUsers />
+                    <span>Сотрудники</span>
+                  </a>
+                </div>
+              )}
+
               <div className="nav-section">
                 <h3>Профиль</h3>
                 <a href="/profile" className="nav-link" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>

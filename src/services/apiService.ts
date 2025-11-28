@@ -563,6 +563,8 @@ class ApiService {
     username: string;
     password: string;
     email?: string;
+    firstName?: string;
+    lastName?: string;
     role: 'admin' | 'manager' | 'warehouseman';
     warehouseId?: number;
   }): Promise<User | undefined> {
@@ -571,6 +573,8 @@ class ApiService {
         username: userData.username,
         passwordHash: userData.password, // Backend ожидает passwordHash
         email: userData.email || 'user@warehouse.local',
+        firstName: userData.firstName || userData.username,
+        lastName: userData.lastName || '',
         role: userData.role,
         warehouseId: userData.warehouseId || null,
         isActive: true,
@@ -601,24 +605,46 @@ class ApiService {
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
-    const data = await this.fetchApi<any>(`/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
+    console.log('updateUser payload:', updates);
+    try {
+      const data = await this.fetchApi<any>(`/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
 
-    if (!data) return undefined;
+      // Если 204 No Content (data === null), возвращаем обновлённые данные
+      if (data === null) {
+        return {
+          id: String(updates.id || id),
+          username: updates.username || '',
+          email: updates.email || '',
+          passwordHash: updates.passwordHash,
+          role: (updates.role as UserRole) || 'warehouseman',
+          firstName: updates.firstName || '',
+          lastName: updates.lastName || '',
+          isActive: updates.isActive !== undefined ? updates.isActive : true,
+          createdAt: new Date(),
+          warehouseId: updates.warehouseId,
+        };
+      }
 
-    return {
-      id: String(data.id),
-      username: data.username,
-      email: data.email,
-      role: data.role as UserRole,
-      firstName: data.firstName || data.username,
-      lastName: data.lastName || '',
-      isActive: data.isActive,
-      createdAt: new Date(data.createdAt),
-      warehouseId: data.warehouseId,
-    };
+      // Если есть данные в ответе, используем их
+      return {
+        id: String(data.id),
+        username: data.username,
+        email: data.email,
+        passwordHash: data.passwordHash,
+        role: data.role as UserRole,
+        firstName: data.firstName || data.username,
+        lastName: data.lastName || '',
+        isActive: data.isActive,
+        createdAt: new Date(data.createdAt),
+        warehouseId: data.warehouseId,
+      };
+    } catch (error) {
+      console.error('Ошибка при обновлении пользователя:', error);
+      return undefined;
+    }
   }
 
   async deleteUser(id: string): Promise<boolean> {

@@ -22,6 +22,9 @@ export const UserManagementPage = () => {
     username: '',
     password: '',
     email: '',
+    firstName: '',
+    lastName: '',
+    passwordHash: '',
     role: 'warehouseman' as 'warehouseman' | 'manager' | 'admin',
     warehouseId: '' as string | number,
   });
@@ -91,6 +94,9 @@ export const UserManagementPage = () => {
       username: '',
       password: '',
       email: '',
+      firstName: '',
+      lastName: '',
+      passwordHash: '',
       role: 'warehouseman',
       warehouseId: isManager ? user?.warehouseId || '' : '',
     });
@@ -103,8 +109,12 @@ export const UserManagementPage = () => {
     setFormData({
       username: userToEdit.username,
       email: userToEdit.email || '',
-      role: userToEdit.role,
+      firstName: userToEdit.firstName || '',
+      lastName: userToEdit.lastName || '',
+      passwordHash: userToEdit.passwordHash || '',
+      role: userToEdit.role as 'admin' | 'manager' | 'warehouseman',
       warehouseId: userToEdit.warehouseId || '',
+      password: '',
     });
     setShowModal(true);
   };
@@ -116,6 +126,9 @@ export const UserManagementPage = () => {
       username: '',
       password: '',
       email: '',
+      firstName: '',
+      lastName: '',
+      passwordHash: '',
       role: 'warehouseman',
       warehouseId: '',
     });
@@ -152,8 +165,20 @@ export const UserManagementPage = () => {
           handleCloseModal();
         }
       } else if (editingUser) {
-        // TODO: Implement updateUser in apiService
-        const updated = await apiService.updateUser?.(editingUser.id, formData as any);
+        // При обновлении используем passwordHash только если пароль не меняется
+        const updateData: any = {
+          id: parseInt(editingUser.id),
+          username: formData.username,
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          role: formData.role,
+          warehouseId: formData.warehouseId ? parseInt(String(formData.warehouseId)) : null,
+          isActive: true,
+          // Если новый пароль введён - передаём его, иначе передаём старый хеш
+          passwordHash: formData.password || formData.passwordHash,
+        };
+        const updated = await apiService.updateUser?.(editingUser.id, updateData as any);
         if (updated) {
           setUsers(users.map(u => u.id === editingUser.id ? updated : u));
           alert('Пользователь успешно обновлён!');

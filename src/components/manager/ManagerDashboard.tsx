@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { FiBox, FiAlertTriangle, FiClipboard, FiDollarSign } from 'react-icons/fi';
+import { useAuth } from '../../contexts/useAuth';
 import { apiService } from '../../services/apiService';
 import type { Product, Request } from '../../types';
 import './Manager.css';
 
 export const ManagerDashboard: React.FC = () => {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -13,13 +15,13 @@ export const ManagerDashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user?.warehouseId]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
       const [productsData, requestsData] = await Promise.all([
-        apiService.getProducts(),
+        apiService.getProducts(String(user?.warehouseId)),
         apiService.getRequests(),
       ]);
       setProducts(productsData);

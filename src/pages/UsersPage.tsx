@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/useAuth';
+import { useNotification } from '../contexts/useNotification';
 import type { User, Warehouse } from '../types';
 import { apiService } from '../services/apiService';
 import { EditUserModal } from '../components/EditUserModal';
@@ -7,6 +8,7 @@ import './Pages.css';
 
 export const UsersPage = () => {
   const { user } = useAuth();
+  const { showSuccess, showError, showInfo } = useNotification();
   const [users, setUsers] = useState<User[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,8 +24,11 @@ export const UsersPage = () => {
     username: '',
     password: '',
     email: '',
-    role: 'warehouseman' as const,
-    warehouseId: '',
+    firstName: '',
+    lastName: '',
+    passwordHash: '',
+    role: 'warehouseman' as 'admin' | 'manager' | 'warehouseman',
+    warehouseId: '' as string | number,
   });
 
   const isAdmin = user?.role === 'admin';
@@ -42,7 +47,7 @@ export const UsersPage = () => {
         setWarehouses(warehousesData);
       } catch (error) {
         console.error('Ошибка при загрузке пользователей:', error);
-        alert('Не удалось загрузить пользователей');
+        showError('Не удалось загрузить пользователей');
       } finally {
         setLoading(false);
       }
@@ -91,6 +96,9 @@ export const UsersPage = () => {
       username: '',
       password: '',
       email: '',
+      firstName: '',
+      lastName: '',
+      passwordHash: '',
       role: 'warehouseman',
       warehouseId: isManager ? user?.warehouseId || '' : '',
     });
@@ -103,8 +111,12 @@ export const UsersPage = () => {
     setFormData({
       username: userToEdit.username,
       email: userToEdit.email || '',
-      role: userToEdit.role,
+      firstName: userToEdit.firstName || '',
+      lastName: userToEdit.lastName || '',
+      passwordHash: userToEdit.passwordHash || '',
+      role: userToEdit.role as 'admin' | 'manager' | 'warehouseman',
       warehouseId: userToEdit.warehouseId || '',
+      password: '',
     });
     setShowModal(true);
   };
@@ -116,6 +128,9 @@ export const UsersPage = () => {
       username: '',
       password: '',
       email: '',
+      firstName: '',
+      lastName: '',
+      passwordHash: '',
       role: 'warehouseman',
       warehouseId: '',
     });
@@ -127,18 +142,18 @@ export const UsersPage = () => {
 
   const handleSave = async () => {
     if (!formData.username.trim()) {
-      alert('Введите логин');
+      showError('Введите логин');
       return;
     }
 
     // Проверка прав менеджера - может создавать только warehouseman
     if (isManager && formData.role !== 'warehouseman') {
-      alert('Менеджеры могут создавать только пользователей роли "Складовщик"');
+      showError('Менеджеры могут создавать только пользователей роли "Складовщик"');
       return;
     }
 
-    if (formData.role !== 'admin' && !formData.warehouseId) {
-      alert('Выберите площадку для пользователя');
+    if ((formData.role as string) !== 'admin' && !formData.warehouseId) {
+      showError('Выберите площадку для пользователя');
       return;
     }
 
@@ -146,20 +161,33 @@ export const UsersPage = () => {
     try {
       if (isNew) {
         if (!formData.password) {
-          alert('Введите пароль');
+          showError('Введите пароль');
           setIsSaving(false);
           return;
         }
         const created = await apiService.createUser(formData as any);
         if (created) {
           setUsers([...users, created]);
-          alert('Пользователь успешно создан!');
+          showSuccess('Пользователь успешно создан!');
           handleCloseModal();
         } else {
           alert('Ошибка при создании пользователя');
         }
       } else if (editingUser) {
-        const updated = await apiService.updateUser(editingUser.id, formData as any);
+        // При обновлении используем passwordHash только если пароль не меняется
+        const updateData: any = {
+          id: parseInt(editingUser.id),
+          username: formData.username,
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          role: formData.role,
+          warehouseId: formData.warehouseId ? parseInt(String(formData.warehouseId)) : null,
+          isActive: true,
+          // Если новый пароль введён - передаём его, иначе передаём старый хеш
+          passwordHash: formData.password || formData.passwordHash,
+        };
+        const updated = await apiService.updateUser(editingUser.id, updateData);
         if (updated) {
           setUsers(users.map(u => u.id === editingUser.id ? updated : u));
           alert('Пользователь успешно обновлён!');
@@ -264,6 +292,7 @@ export const UsersPage = () => {
         onSave={handleSave}
         onClose={handleCloseModal}
         isLoading={isSaving}
+        userRole={user?.role as any}
       />
 
       <div className="users-table">
