@@ -60,9 +60,9 @@ const DashboardRouter = () => {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <NotificationProvider>
+    <NotificationProvider>
+      <BrowserRouter>
+        <AuthProvider>
           <ToastContainer />
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -76,9 +76,9 @@ function App() {
               }
             />
           </Routes>
-        </NotificationProvider>
-      </AuthProvider>
-    </BrowserRouter>
+        </AuthProvider>
+      </BrowserRouter>
+    </NotificationProvider>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/useAuth';
+import { useNotification } from '../contexts/useNotification';
 import type { Product, Warehouse, User } from '../types';
 import type { Category } from '../types';
 import { apiService } from '../services/apiService';
@@ -10,6 +11,7 @@ import './Pages.css';
 
 export const LocationsPage = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -146,7 +148,7 @@ export const LocationsPage = () => {
 
   const handleAddWarehouse = async () => {
     if (!newWarehouseForm.name || !newWarehouseForm.location) {
-      alert('Заполните все поля');
+      showError('Заполните все поля');
       return;
     }
 
@@ -158,21 +160,21 @@ export const LocationsPage = () => {
       setWarehouses([...warehouses, newWarehouse]);
       setShowAddWarehouseForm(false);
       setNewWarehouseForm({ name: '', location: '' });
-      alert('Площадка успешно добавлена');
+      showSuccess('Площадка успешно добавлена');
     } catch (error) {
       console.error('Ошибка при добавлении площадки:', error);
-      alert('Не удалось добавить площадку');
+      showError('Не удалось добавить площадку');
     }
   };
 
   const handleAddProduct = async () => {
     if (!addProductForm.name || !addProductForm.category || !selectedWarehouse || !addProductForm.sku || !addProductForm.barcode) {
-      alert('Заполните все обязательные поля');
+      showError('Заполните все обязательные поля');
       return;
     }
 
     if (addProductForm.quantity <= 0 || addProductForm.price <= 0) {
-      alert('Количество и цена должны быть больше нуля');
+      showError('Количество и цена должны быть больше нуля');
       return;
     }
 
@@ -204,11 +206,11 @@ export const LocationsPage = () => {
           minQuantity: 10,
           location: '',
         });
-        alert('Товар успешно добавлен на площадку');
+        showSuccess('Товар успешно добавлен на площадку');
       }
     } catch (error) {
       console.error('Ошибка при добавлении товара:', error);
-      alert('Не удалось добавить товар');
+      showError('Не удалось добавить товар');
     }
   };
 
@@ -231,7 +233,7 @@ export const LocationsPage = () => {
     if (!editingProduct) return;
 
     if (!editProductForm.name || !editProductForm.sku || !editProductForm.barcode) {
-      alert('Заполните все обязательные поля');
+      showError('Заполните все обязательные поля');
       return;
     }
 
@@ -244,12 +246,12 @@ export const LocationsPage = () => {
 
       if (updated) {
         setProducts(products.map(p => p.id === updated.id ? updated : p));
-        alert('Товар успешно обновлён');
+        showSuccess('Товар успешно обновлён');
         closeEditModal();
       }
     } catch (error) {
       console.error('Ошибка при обновлении товара:', error);
-      alert('Не удалось обновить товар');
+      showError('Не удалось обновить товар');
     } finally {
       setIsSavingEdit(false);
     }
@@ -277,28 +279,28 @@ export const LocationsPage = () => {
       const deleted = await apiService.deleteProduct(productId);
       if (deleted) {
         setProducts(products.filter(p => p.id !== productId));
-        alert('Товар успешно удалён');
+        showSuccess('Товар успешно удалён');
       }
     } catch (error) {
       console.error('Ошибка при удалении товара:', error);
-      alert('Не удалось удалить товар');
+      showError('Не удалось удалить товар');
     }
   };
 
   const handleTransfer = async () => {
     if (!transferForm.productId || !transferForm.targetWarehouseId || transferForm.quantity <= 0) {
-      alert('Заполните все поля корректно');
+      showError('Заполните все поля корректно');
       return;
     }
 
     const product = products.find(p => p.id === transferForm.productId);
     if (!product) {
-      alert('Товар не найден');
+      showError('Товар не найден');
       return;
     }
 
     if (product.quantity < transferForm.quantity) {
-      alert('Недостаточно товара на складе');
+      showError('Недостаточно товара на складе');
       return;
     }
 
@@ -321,10 +323,10 @@ export const LocationsPage = () => {
       });
       setShowTransferForm(false);
       setTransferForm({ productId: '', quantity: 0, targetWarehouseId: '', notes: '' });
-      alert('Заявка на перемещение создана успешно');
+      showSuccess('Заявка на перемещение создана успешно');
     } catch (error) {
       console.error('Ошибка при создании заявки:', error);
-      alert('Не удалось создать заявку');
+      showError('Не удалось создать заявку');
     }
   };
 
@@ -362,7 +364,7 @@ export const LocationsPage = () => {
       pdf.save(`${warehouse.name}_${new Date().getTime()}.pdf`);
     } catch (error) {
       console.error('Ошибка при экспорте в PDF:', error);
-      alert('Ошибка при экспорте в PDF');
+      showError('Ошибка при экспорте в PDF');
     }
   };
 

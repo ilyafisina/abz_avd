@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
+using WarehouseAPI.Services;
 
 namespace WarehouseAPI.Controllers;
 
@@ -10,10 +11,12 @@ namespace WarehouseAPI.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly WarehouseContext _context;
+    private readonly IAuditService _auditService;
 
-    public ProductsController(WarehouseContext context)
+    public ProductsController(WarehouseContext context, IAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -62,6 +65,16 @@ public class ProductsController : ControllerBase
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
 
+        await _auditService.LogActionAsync(
+            "CREATE",
+            "Product",
+            product.Id,
+            null,
+            product.WarehouseId,
+            description: $"Product {product.Name} (SKU: {product.Sku}) created with price {product.Price}",
+            logLevel: "INFO"
+        );
+
         return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
     }
 
@@ -71,6 +84,8 @@ public class ProductsController : ControllerBase
         var product = await _context.Products.FindAsync(id);
         if (product == null)
             return NotFound();
+
+        var oldValues = new { product.Name, product.Sku, product.Price, product.Quantity, product.Location };
 
         if (!string.IsNullOrEmpty(request.Name)) product.Name = request.Name;
         if (!string.IsNullOrEmpty(request.Sku)) product.Sku = request.Sku;
@@ -85,6 +100,19 @@ public class ProductsController : ControllerBase
         product.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+
+        var newValues = new { product.Name, product.Sku, product.Price, product.Quantity, product.Location };
+        
+        await _auditService.LogActionAsync(
+            "UPDATE",
+            "Product",
+            id,
+            null,
+            product.WarehouseId,
+            description: $"Product {product.Name} updated",
+            logLevel: "INFO"
+        );
+
         return NoContent();
     }
 
@@ -97,6 +125,17 @@ public class ProductsController : ControllerBase
 
         _context.Products.Remove(product);
         await _context.SaveChangesAsync();
+
+        await _auditService.LogActionAsync(
+            "DELETE",
+            "Product",
+            id,
+            null,
+            product.WarehouseId,
+            description: $"Product {product.Name} deleted",
+            logLevel: "WARNING"
+        );
+
         return NoContent();
     }
 }

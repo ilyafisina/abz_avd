@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import type { Product, Warehouse } from '../types';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/useAuth';
+import { useNotification } from '../contexts/useNotification';
 import { QRScanner } from '../components/QRScanner';
 import { EditProductModal } from '../components/EditProductModal';
 import '../components/QRScanner.css';
 import './Pages.css';
 
 export const ProductsPage = () => {
+  const { showSuccess, showError } = useNotification();
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -105,7 +107,7 @@ export const ProductsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.sku.trim() || !formData.barcode.trim()) {
-      alert('Заполните все обязательные поля (название, SKU, штрихкод)!');
+      showError('Заполните все обязательные поля (название, SKU, штрихкод)!');
       return;
     }
 
@@ -114,14 +116,14 @@ export const ProductsPage = () => {
       const created = await apiService.createProduct(formData);
       if (created) {
         setProducts([...products, created]);
-        alert('Товар успешно добавлен!');
+        showSuccess('Товар успешно добавлен!');
         resetForm();
       } else {
-        alert('Ошибка при создании товара');
+        showError('Ошибка при создании товара');
       }
     } catch (error) {
       console.error('Ошибка при сохранении товара:', error);
-      alert('Не удалось сохранить товар');
+      showError('Не удалось сохранить товар');
     } finally {
       setIsSaving(false);
     }
@@ -131,7 +133,7 @@ export const ProductsPage = () => {
     if (!editingProduct) return;
     
     if (!formData.name.trim() || !formData.sku.trim() || !formData.barcode.trim()) {
-      alert('Заполните все обязательные поля (название, SKU, штрихкод)!');
+      showError('Заполните все обязательные поля (название, SKU, штрихкод)!');
       return;
     }
 
@@ -140,14 +142,14 @@ export const ProductsPage = () => {
       const updated = await apiService.updateProduct(editingProduct.id, formData);
       if (updated) {
         setProducts(products.map((p) => (p.id === editingProduct.id ? updated : p)));
-        alert('Товар успешно обновлён!');
+        showSuccess('Товар успешно обновлён!');
         closeEditModal();
       } else {
-        alert('Ошибка при обновлении товара');
+        showError('Ошибка при обновлении товара');
       }
     } catch (error) {
       console.error('Ошибка при обновлении товара:', error);
-      alert('Не удалось обновить товар');
+      showError('Не удалось обновить товар');
     } finally {
       setIsSaving(false);
     }
@@ -217,13 +219,13 @@ export const ProductsPage = () => {
       const deleted = await apiService.deleteProduct(id);
       if (deleted) {
         setProducts(products.filter((p) => p.id !== id));
-        alert('Товар успешно удалён!');
+        showSuccess('Товар успешно удалён!');
       } else {
-        alert('Ошибка при удалении товара');
+        showError('Ошибка при удалении товара');
       }
     } catch (error) {
       console.error('Ошибка при удалении товара:', error);
-      alert('Ошибка при удалении товара');
+      showError('Ошибка при удалении товара');
     }
   };
 

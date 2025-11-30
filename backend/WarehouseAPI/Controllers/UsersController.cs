@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
+using WarehouseAPI.Services;
 
 namespace WarehouseAPI.Controllers;
 
@@ -10,10 +11,12 @@ namespace WarehouseAPI.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly WarehouseContext _context;
+    private readonly IAuditService _auditService;
 
-    public UsersController(WarehouseContext context)
+    public UsersController(WarehouseContext context, IAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -35,8 +38,34 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<object>> Login(LoginRequest request)
     {
         var user = await _context.Users.Include(u => u.Warehouse).FirstOrDefaultAsync(u => u.Username == request.Username);
+        
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+
         if (user == null || user.PasswordHash != HashPassword(request.Password))
+        {
+            await _auditService.LogActionAsync(
+                "LOGIN_FAILED",
+                "User",
+                null,
+                null,
+                null,
+                description: $"Failed login attempt for user: {request.Username}",
+                logLevel: "WARNING",
+                ipAddress: ipAddress
+            );
             return Unauthorized();
+        }
+
+        await _auditService.LogActionAsync(
+            "LOGIN",
+            "User",
+            user.Id,
+            user.Id,
+            user.WarehouseId,
+            description: $"User {user.Username} logged in",
+            logLevel: "INFO",
+            ipAddress: ipAddress
+        );
 
         return Ok(new 
         { 
@@ -61,8 +90,21 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<User>> CreateUser(User user)
     {
         user.PasswordHash = HashPassword(user.PasswordHash);
+        user.CreatedAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
+        
+        await _auditService.LogActionAsync(
+            "CREATE",
+            "User",
+            user.Id,
+            null,
+            user.WarehouseId,
+            description: $"User {user.Username} ({user.Email}) created",
+            logLevel: "INFO"
+        );
+        
         return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
     }
 
@@ -72,7 +114,34 @@ public class UsersController : ControllerBase
         if (id != user.Id)
             return BadRequest();
 
-        _context.Entry(user).State = EntityState.Modified;
+        var existingUser = await _context.Users.FindAsync(id);
+        if (existingUser == null)
+            return NotFound();
+
+        var oldValues = new { existingUser.Username, existingUser.Email, existingUser.Role, existingUser.FirstName, existingUser.LastName };
+
+        existingUser.Username = user.Username;
+        existingUser.Email = user.Email;
+        existingUser.FirstName = user.FirstName;
+        existingUser.LastName = user.LastName;
+        existingUser.Role = user.Role;
+        existingUser.WarehouseId = user.WarehouseId;
+        existingUser.IsActive = user.IsActive;
+        existingUser.UpdatedAt = DateTime.UtcNow;
+
+        if (!string.IsNullOrEmpty(user.PasswordHash))
+        {
+            if (user.PasswordHash.Length < 40 || !IsValidBase64(user.PasswordHash))
+            {
+                existingUser.PasswordHash = HashPassword(user.PasswordHash);
+            }
+            else
+            {
+                existingUser.PasswordHash = user.PasswordHash;
+            }
+        }
+
+        _context.Entry(existingUser).State = EntityState.Modified;
         try
         {
             await _context.SaveChangesAsync();
@@ -83,6 +152,19 @@ public class UsersController : ControllerBase
                 return NotFound();
             throw;
         }
+
+        var newValues = new { existingUser.Username, existingUser.Email, existingUser.Role, existingUser.FirstName, existingUser.LastName };
+        
+        await _auditService.LogActionAsync(
+            "UPDATE",
+            "User",
+            id,
+            null,
+            existingUser.WarehouseId,
+            description: $"User {existingUser.Username} updated",
+            logLevel: "INFO"
+        );
+        
         return NoContent();
     }
 
@@ -95,12 +177,36 @@ public class UsersController : ControllerBase
 
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
+        
+        await _auditService.LogActionAsync(
+            "DELETE",
+            "User",
+            id,
+            null,
+            user.WarehouseId,
+            description: $"User {user.Username} deleted",
+            logLevel: "WARNING"
+        );
+
         return NoContent();
     }
 
     private bool UserExists(int id)
     {
         return _context.Users.Any(e => e.Id == id);
+    }
+
+    private bool IsValidBase64(string str)
+    {
+        try
+        {
+            System.Convert.FromBase64String(str);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private string HashPassword(string password)

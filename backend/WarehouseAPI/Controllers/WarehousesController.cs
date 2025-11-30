@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
+using WarehouseAPI.Services;
 
 namespace WarehouseAPI.Controllers;
 
@@ -10,10 +11,12 @@ namespace WarehouseAPI.Controllers;
 public class WarehousesController : ControllerBase
 {
     private readonly WarehouseContext _context;
+    private readonly IAuditService _auditService;
 
-    public WarehousesController(WarehouseContext context)
+    public WarehousesController(WarehouseContext context, IAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -39,6 +42,17 @@ public class WarehousesController : ControllerBase
 
         _context.Warehouses.Add(warehouse);
         await _context.SaveChangesAsync();
+
+        await _auditService.LogActionAsync(
+            "CREATE",
+            "Warehouse",
+            warehouse.Id,
+            null,
+            warehouse.Id,
+            description: $"Warehouse {warehouse.Name} at {warehouse.Location} created",
+            logLevel: "INFO"
+        );
+
         return CreatedAtAction(nameof(GetWarehouse), new { id = warehouse.Id }, warehouse);
     }
 
@@ -59,6 +73,17 @@ public class WarehousesController : ControllerBase
                 return NotFound();
             throw;
         }
+
+        await _auditService.LogActionAsync(
+            "UPDATE",
+            "Warehouse",
+            id,
+            null,
+            id,
+            description: $"Warehouse {warehouse.Name} updated",
+            logLevel: "INFO"
+        );
+
         return NoContent();
     }
 
@@ -71,6 +96,17 @@ public class WarehousesController : ControllerBase
 
         _context.Warehouses.Remove(warehouse);
         await _context.SaveChangesAsync();
+
+        await _auditService.LogActionAsync(
+            "DELETE",
+            "Warehouse",
+            id,
+            null,
+            id,
+            description: $"Warehouse {warehouse.Name} deleted",
+            logLevel: "WARNING"
+        );
+
         return NoContent();
     }
 

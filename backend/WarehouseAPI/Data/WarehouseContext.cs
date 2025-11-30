@@ -18,6 +18,7 @@ public class WarehouseContext : DbContext
     public DbSet<TransferProduct> TransferProducts { get; set; }
     public DbSet<TransferComment> TransferComments { get; set; }
     public DbSet<Log> Logs { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -191,6 +192,39 @@ public class WarehouseContext : DbContext
             entity.HasOne(e => e.TransferWarehouse)
                 .WithMany()
                 .HasForeignKey(e => e.TransferWarehouseId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+        });
+
+        // AuditLog configuration
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Action).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Entity).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.EntityId).HasMaxLength(50);
+            entity.Property(e => e.Details).HasColumnType("longtext");
+            entity.Property(e => e.Level).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.Property(e => e.UserAgent).HasMaxLength(500);
+            entity.Property(e => e.Timestamp).IsRequired();
+
+            // Create index for common queries
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => e.Level);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.WarehouseId);
+            entity.HasIndex(e => new { e.WarehouseId, e.Timestamp });
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            entity.HasOne(e => e.Warehouse)
+                .WithMany()
+                .HasForeignKey(e => e.WarehouseId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .IsRequired(false);
         });

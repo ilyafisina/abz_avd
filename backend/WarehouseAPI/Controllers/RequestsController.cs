@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
+using WarehouseAPI.Services;
 
 namespace WarehouseAPI.Controllers;
 
@@ -10,10 +11,12 @@ namespace WarehouseAPI.Controllers;
 public class RequestsController : ControllerBase
 {
     private readonly WarehouseContext _context;
+    private readonly IAuditService _auditService;
 
-    public RequestsController(WarehouseContext context)
+    public RequestsController(WarehouseContext context, IAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -41,6 +44,17 @@ public class RequestsController : ControllerBase
     {
         _context.Requests.Add(request);
         await _context.SaveChangesAsync();
+
+        await _auditService.LogActionAsync(
+            "CREATE",
+            "Request",
+            request.Id,
+            null,
+            request.WarehouseId,
+            description: $"Request {request.Id} created with status {request.Status}",
+            logLevel: "INFO"
+        );
+
         return CreatedAtAction(nameof(GetRequest), new { id = request.Id }, request);
     }
 
@@ -49,6 +63,9 @@ public class RequestsController : ControllerBase
     {
         if (id != request.Id)
             return BadRequest();
+
+        var oldRequest = await _context.Requests.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
+        var oldStatus = oldRequest?.Status;
 
         _context.Entry(request).State = EntityState.Modified;
         try
@@ -61,6 +78,21 @@ public class RequestsController : ControllerBase
                 return NotFound();
             throw;
         }
+
+        string description = $"Request {id} updated";
+        if (oldStatus != request.Status)
+            description = $"Request {id} status changed from {oldStatus} to {request.Status}";
+
+        await _auditService.LogActionAsync(
+            "UPDATE",
+            "Request",
+            id,
+            null,
+            request.WarehouseId,
+            description: description,
+            logLevel: "INFO"
+        );
+
         return NoContent();
     }
 
@@ -73,6 +105,17 @@ public class RequestsController : ControllerBase
 
         _context.Requests.Remove(request);
         await _context.SaveChangesAsync();
+
+        await _auditService.LogActionAsync(
+            "DELETE",
+            "Request",
+            id,
+            null,
+            request.WarehouseId,
+            description: $"Request {id} with status {request.Status} deleted",
+            logLevel: "WARNING"
+        );
+
         return NoContent();
     }
 

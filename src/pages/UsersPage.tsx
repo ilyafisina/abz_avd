@@ -171,10 +171,12 @@ export const UsersPage = () => {
           showSuccess('Пользователь успешно создан!');
           handleCloseModal();
         } else {
-          alert('Ошибка при создании пользователя');
+          showError('Ошибка при создании пользователя');
         }
       } else if (editingUser) {
-        // При обновлении используем passwordHash только если пароль не меняется
+        // При обновлении:
+        // - Если пароль введён - отправляем новый пароль для хеширования
+        // - Если пароль пустой - отправляем пустую строку, backend сохранит старый хеш
         const updateData: any = {
           id: parseInt(editingUser.id),
           username: formData.username,
@@ -184,21 +186,21 @@ export const UsersPage = () => {
           role: formData.role,
           warehouseId: formData.warehouseId ? parseInt(String(formData.warehouseId)) : null,
           isActive: true,
-          // Если новый пароль введён - передаём его, иначе передаём старый хеш
-          passwordHash: formData.password || formData.passwordHash,
+          // Отправляем пароль только если он новый, иначе пустую строку
+          passwordHash: formData.password || '',
         };
         const updated = await apiService.updateUser(editingUser.id, updateData);
         if (updated) {
           setUsers(users.map(u => u.id === editingUser.id ? updated : u));
-          alert('Пользователь успешно обновлён!');
+          showSuccess('Пользователь успешно обновлён!');
           handleCloseModal();
         } else {
-          alert('Ошибка при обновлении пользователя');
+          showError('Ошибка при обновлении пользователя');
         }
       }
     } catch (error) {
       console.error('Ошибка при сохранении пользователя:', error);
-      alert('Не удалось сохранить пользователя');
+      showError('Не удалось сохранить пользователя');
     } finally {
       setIsSaving(false);
     }
@@ -211,13 +213,13 @@ export const UsersPage = () => {
       const deleted = await apiService.deleteUser(userId);
       if (deleted) {
         setUsers(users.filter(u => u.id !== userId));
-        alert('Пользователь успешно удалён!');
+        showSuccess('Пользователь успешно удалён!');
       } else {
-        alert('Ошибка при удалении пользователя');
+        showError('Ошибка при удалении пользователя');
       }
     } catch (error) {
       console.error('Ошибка при удалении пользователя:', error);
-      alert('Не удалось удалить пользователя');
+      showError('Не удалось удалить пользователя');
     }
   };
 

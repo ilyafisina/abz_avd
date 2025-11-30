@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import type { Request, Warehouse, RequestProduct, RequestType, RequestStatus } from '../types';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/useAuth';
+import { useNotification } from '../contexts/useNotification';
 import jsPDF from 'jspdf';
 import './Pages.css';
 
 export const RequestsPage = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const [requests, setRequests] = useState<Request[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [filterStatus, setFilterStatus] = useState<RequestStatus | 'all'>('all');
@@ -84,7 +86,7 @@ export const RequestsPage = () => {
     e.preventDefault();
 
     if (formData.products.length === 0) {
-      alert('Добавьте товары в заявку!');
+      showError('Добавьте товары в заявку!');
       return;
     }
 
@@ -105,11 +107,11 @@ export const RequestsPage = () => {
       };
 
       setRequests([newRequest, ...requests]);
-      alert('Заявка успешно создана!');
+      showSuccess('Заявка успешно создана!');
       resetForm();
     } catch (error) {
       console.error('Ошибка при создании заявки:', error);
-      alert('Ошибка при создании заявки');
+      showError('Ошибка при создании заявки');
     }
   };
 
@@ -197,10 +199,10 @@ export const RequestsPage = () => {
       setRequests(
         requests.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
       );
-      alert('Статус обновлён!');
+      showSuccess('Статус обновлён!');
     } catch (error) {
       console.error('Ошибка при обновлении статуса:', error);
-      alert('Ошибка при обновлении статуса');
+      showError('Ошибка при обновлении статуса');
     }
   };
 

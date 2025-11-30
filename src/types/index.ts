@@ -103,6 +103,22 @@ export interface SystemLog {
   ipAddress?: string;
 }
 
+// Интерфейс аудит лога (новая система логирования)
+export interface AuditLog {
+  id: number;
+  action: string;
+  entity: string;
+  entityId?: string;
+  userId?: number;
+  userName?: string;
+  warehouseId?: number;
+  warehouseName?: string;
+  details?: string;
+  level: 'INFO' | 'WARNING' | 'ERROR' | 'DEBUG';
+  timestamp: Date;
+  ipAddress?: string;
+}
+
 // Интерфейс отчёта о товарах
 export interface InventoryReport {
   id: string;

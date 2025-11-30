@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/useAuth';
+import { useNotification } from '../contexts/useNotification';
 import type { User, Warehouse } from '../types';
 import { apiService } from '../services/apiService';
 import { EditUserModal } from '../components/EditUserModal';
@@ -7,6 +8,7 @@ import './Pages.css';
 
 export const UserManagementPage = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const [users, setUsers] = useState<User[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,7 @@ export const UserManagementPage = () => {
         setWarehouses(warehousesData);
       } catch (error) {
         console.error('Ошибка при загрузке пользователей:', error);
-        alert('Не удалось загрузить пользователей');
+        showError('Не удалось загрузить пользователей');
       } finally {
         setLoading(false);
       }
@@ -140,12 +142,12 @@ export const UserManagementPage = () => {
 
   const handleSave = async () => {
     if (!formData.username.trim()) {
-      alert('Введите логин');
+      showError('Введите логин');
       return;
     }
 
     if (formData.role !== 'admin' && !formData.warehouseId) {
-      alert('Выберите площадку для пользователя');
+      showError('Выберите площадку для пользователя');
       return;
     }
 
@@ -153,7 +155,7 @@ export const UserManagementPage = () => {
     try {
       if (isNew) {
         if (!formData.password) {
-          alert('Введите пароль');
+          showError('Введите пароль');
           setIsSaving(false);
           return;
         }
@@ -161,11 +163,13 @@ export const UserManagementPage = () => {
         const created = await apiService.createUser?.(formData as any);
         if (created) {
           setUsers([...users, created]);
-          alert('Пользователь успешно создан!');
+          showSuccess('Пользователь успешно создан!');
           handleCloseModal();
         }
       } else if (editingUser) {
-        // При обновлении используем passwordHash только если пароль не меняется
+        // При обновлении:
+        // - Если пароль введён - отправляем новый пароль для хеширования
+        // - Если пароль пустой - отправляем пустую строку, backend сохранит старый хеш
         const updateData: any = {
           id: parseInt(editingUser.id),
           username: formData.username,
@@ -175,19 +179,19 @@ export const UserManagementPage = () => {
           role: formData.role,
           warehouseId: formData.warehouseId ? parseInt(String(formData.warehouseId)) : null,
           isActive: true,
-          // Если новый пароль введён - передаём его, иначе передаём старый хеш
-          passwordHash: formData.password || formData.passwordHash,
+          // Отправляем пароль только если он новый, иначе пустую строку
+          passwordHash: formData.password || '',
         };
         const updated = await apiService.updateUser?.(editingUser.id, updateData as any);
         if (updated) {
           setUsers(users.map(u => u.id === editingUser.id ? updated : u));
-          alert('Пользователь успешно обновлён!');
+          showSuccess('Пользователь успешно обновлён!');
           handleCloseModal();
         }
       }
     } catch (error) {
       console.error('Ошибка при сохранении пользователя:', error);
-      alert('Не удалось сохранить пользователя');
+      showError('Не удалось сохранить пользователя');
     } finally {
       setIsSaving(false);
     }
@@ -201,11 +205,11 @@ export const UserManagementPage = () => {
       const deleted = await apiService.deleteUser?.(userId);
       if (deleted) {
         setUsers(users.filter(u => u.id !== userId));
-        alert('Пользователь успешно удалён!');
+        showSuccess('Пользователь успешно удалён!');
       }
     } catch (error) {
       console.error('Ошибка при удалении пользователя:', error);
-      alert('Не удалось удалить пользователя');
+      showError('Не удалось удалить пользователя');
     }
   };
 

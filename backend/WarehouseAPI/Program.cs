@@ -1,8 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using WarehouseAPI.Data;
+using WarehouseAPI.Services;
 using System.Text.Json.Serialization;
+using log4net;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure log4net
+log4net.Config.XmlConfigurator.Configure(new System.IO.FileInfo("log4net.config"));
 
 // Add services to the container
 builder.Services.AddControllers()
@@ -15,16 +20,26 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add Audit Service
+builder.Services.AddScoped<IAuditService, AuditService>();
+
 // Add CORS with explicit configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .AllowAnyOrigin()
+            .SetIsOriginAllowed(origin => 
+            {
+                // Allow localhost, 127.0.0.1, and 172.x.x.x (Docker networks)
+                return origin.Contains("localhost") || 
+                       origin.Contains("127.0.0.1") ||
+                       origin.Contains("172.") ||
+                       origin.Contains("192.168.");
+            })
             .AllowAnyMethod()
             .AllowAnyHeader()
-            .DisallowCredentials();
+            .AllowCredentials();
     });
 });
 
