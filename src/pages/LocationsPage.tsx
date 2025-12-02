@@ -133,6 +133,202 @@ export const LocationsPage = () => {
     loadData();
   }, []);
 
+  const loadTransfers = (requestsData: Request[] | undefined) => {
+    if (!requestsData || !users || users.length === 0) {
+      console.error('Нет данных для загрузки трансфертов');
+      return;
+    }
+    
+    try {
+      const transfersData = requestsData.map((req: Request) => {
+        const createdUser = users.find((u: User) => String(u.id) === String(req.createdBy));
+        const approvedUser = req.approvedBy ? users.find((u: User) => String(u.id) === String(req.approvedBy)) : undefined;
+        const completedUser = req.completedBy ? users.find((u: User) => String(u.id) === String(req.completedBy)) : undefined;
+        
+        return {
+          id: Number(req.id),
+          fromWarehouseId: req.warehouseId,
+          toWarehouseId: req.transferWarehouseId,
+          startedAt: req.createdAt,
+          completedAt: req.completedAt,
+          status: req.status,
+          products: req.products || [],
+          createdBy: req.createdBy,
+          createdByUser: createdUser,
+          approvedBy: req.approvedBy,
+          approvedByUser: approvedUser,
+          completedBy: req.completedBy,
+          completedByUser: completedUser,
+        };
+      });
+      setTransfers(transfersData || []);
+    } catch (error) {
+      console.error('Ошибка при загрузке трансфертов:', error);
+    }
+  };
+
+  const generateTTN = async (request: Request) => {
+    const fromWarehouse = warehouses.find((w) => w.id === request.warehouseId);
+    const toWarehouse = request.transferWarehouseId ? warehouses.find((w) => w.id === request.transferWarehouseId) : null;
+    
+    let totalQuantity = 0;
+    request.products.forEach((product) => {
+      totalQuantity += product.quantity;
+    });
+
+    // Создаём HTML для PDF
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; color: #000;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 18px;">ООО "ЛОГИСТИЧЕСКИЙ ЦЕНТР"</h2>
+          <p style="margin: 5px 0; font-size: 12px;">АД: г. Москва, ул. Логистическая, д. 1</p>
+          <p style="margin: 5px 0; font-size: 12px;">Тел: +7 (495) 123-45-67 | Email: info@logistics.ru</p>
+          <hr style="border: none; border-top: 1px solid #000; margin: 10px 0;" />
+          <h1 style="margin: 10px 0; font-size: 16px;">ТОВАРОТРАНСПОРТНАЯ НАКЛАДНАЯ (ТТН)</h1>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">ДАННЫЕ ДОКУМЕНТА</h3>
+          <table style="width: 100%; font-size: 11px;">
+            <tr>
+              <td style="width: 50%;">Номер ТТН: ${request.requestNumber}</td>
+              <td>Дата: ${new Date(request.createdAt).toLocaleDateString('ru-RU')}</td>
+            </tr>
+            <tr>
+              <td>Статус: ${request.status}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">СТОРОНЫ ТРАНСПОРТИРОВКИ</h3>
+          <table style="width: 100%; font-size: 11px;">
+            <tr>
+              <td style="width: 50%; padding: 5px; border: 1px solid #000; vertical-align: top;">
+                <strong>От (отправитель):</strong><br/>
+                ${fromWarehouse?.name || 'Неизвестно'}<br/>
+                <strong>Адрес:</strong> ${fromWarehouse?.location || 'Не указан'}
+              </td>
+              <td style="width: 50%; padding: 5px; border: 1px solid #000; vertical-align: top;">
+                <strong>Кому (получатель):</strong><br/>
+                ${toWarehouse?.name || 'Не указано'}<br/>
+                <strong>Адрес:</strong> ${toWarehouse?.location || 'Не указан'}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">СПИСОК ТОВАРОВ</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+            <thead>
+              <tr style="background-color: #f0f0f0;">
+                <th style="border: 1px solid #000; padding: 5px; text-align: left;">№</th>
+                <th style="border: 1px solid #000; padding: 5px; text-align: left;">Наименование товара</th>
+                <th style="border: 1px solid #000; padding: 5px; text-align: center;">Кол-во</th>
+                <th style="border: 1px solid #000; padding: 5px; text-align: left;">Место хранения</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${request.products.map((product, idx) => `
+                <tr>
+                  <td style="border: 1px solid #000; padding: 5px;">${idx + 1}</td>
+                  <td style="border: 1px solid #000; padding: 5px;">${product.productName}</td>
+                  <td style="border: 1px solid #000; padding: 5px; text-align: center;">${product.quantity}</td>
+                  <td style="border: 1px solid #000; padding: 5px;">${product.location || '-'}</td>
+                </tr>
+              `).join('')}
+              <tr style="font-weight: bold;">
+                <td colspan="2" style="border: 1px solid #000; padding: 5px; text-align: right;">ИТОГО:</td>
+                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${totalQuantity}</td>
+                <td style="border: 1px solid #000; padding: 5px;">Товаров: ${request.products.length}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        ${request.notes ? `
+          <div style="margin-bottom: 15px;">
+            <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">ПРИМЕЧАНИЯ</h3>
+            <p style="margin: 5px 0; font-size: 11px; padding: 10px; border: 1px solid #000; background-color: #fafafa;">
+              ${request.notes}
+            </p>
+          </div>
+        ` : ''}
+
+        <div style="margin-top: 30px; display: flex; justify-content: space-between;">
+          <div style="text-align: center; flex: 1;">
+            <div style="height: 40px; border-top: 1px solid #000;"></div>
+            <p style="margin: 3px 0; font-size: 10px;">Подпись отправителя</p>
+          </div>
+          <div style="text-align: center; flex: 1;">
+            <div style="height: 40px; border-top: 1px solid #000;"></div>
+            <p style="margin: 3px 0; font-size: 10px;">Подпись менеджера</p>
+          </div>
+          <div style="text-align: center; flex: 1;">
+            <div style="height: 40px; border-top: 1px solid #000;"></div>
+            <p style="margin: 3px 0; font-size: 10px;">Подпись получателя</p>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center; font-size: 9px; color: #666;">
+          <p style="margin: 0;">Документ создан: ${new Date().toLocaleString('ru-RU')}</p>
+        </div>
+      </div>
+    `;
+
+    // Создаём временный div для html2canvas
+    const element = document.createElement('div');
+    element.innerHTML = htmlContent;
+    element.style.position = 'absolute';
+    element.style.left = '-9999px';
+    element.style.width = '210mm';
+    element.style.background = 'white';
+    document.body.appendChild(element);
+
+    try {
+      // Конвертируем HTML в canvas
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      // Создаём PDF из canvas
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth - 10;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 5;
+
+      // Добавляем изображение на первую страницу
+      pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight - 10;
+
+      // Добавляем дополнительные страницы если нужно
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight + 5;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`TTN-${request.requestNumber}.pdf`);
+    } finally {
+      document.body.removeChild(element);
+    }
+  };
+
   const getTotalValue = (warehouseProducts: Product[]) => {
     return warehouseProducts.reduce((sum, p) => sum + p.price * p.quantity, 0);
   };
@@ -327,6 +523,11 @@ export const LocationsPage = () => {
       return;
     }
 
+    if (!user?.id) {
+      showError('Ошибка: пользователь не авторизован');
+      return;
+    }
+
     try {
       await apiService.createRequest({
         requestType: formData.requestType,
@@ -334,7 +535,7 @@ export const LocationsPage = () => {
         warehouseId: formData.fromWarehouseId || selectedWarehouse || 1,
         transferWarehouseId: formData.toWarehouseId,
         products: formData.products,
-        createdBy: user?.id || 'unknown',
+        createdBy: String(user.id),
         notes: formData.notes,
         priority: formData.priority,
       });
@@ -1278,6 +1479,7 @@ export const LocationsPage = () => {
                       <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Завершено</th>
                       <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Статус</th>
                       <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Дата</th>
+                      <th style={{ textAlign: 'center', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Действия</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1479,6 +1681,182 @@ export const LocationsPage = () => {
                             </td>
                             <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                               {new Date(transfer.startedAt || 0).toLocaleDateString('ru-RU')}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                <button
+                                  onClick={async () => {
+                                    const fullRequest = await apiService.getRequestById(String(transfer.id));
+                                    if (fullRequest) {
+                                      generateTTN(fullRequest);
+                                    }
+                                  }}
+                                  title="Скачать ТТН"
+                                  style={{
+                                    padding: '6px 10px',
+                                    fontSize: '12px',
+                                    backgroundColor: '#27ae60',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#229954';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#27ae60';
+                                  }}
+                                >
+                                  📄
+                                </button>
+                                {transfer.status === 'pending' && (
+                                  <>
+                                    <button
+                                      onClick={async () => {
+                                        await apiService.updateRequestStatus(String(transfer.id), 'approved', user?.id ? parseInt(String(user.id)) : 0);
+                                        const updatedRequests = await apiService.getRequests();
+                                        loadTransfers(updatedRequests);
+                                        showSuccess('Заявка одобрена!');
+                                      }}
+                                      title="Одобрить"
+                                      style={{
+                                        padding: '6px 10px',
+                                        fontSize: '12px',
+                                        backgroundColor: '#3498db',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#2980b9';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#3498db';
+                                      }}
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        await apiService.updateRequestStatus(String(transfer.id), 'rejected', user?.id ? parseInt(String(user.id)) : 0);
+                                        const updatedRequests = await apiService.getRequests();
+                                        loadTransfers(updatedRequests);
+                                        showSuccess('Заявка отклонена!');
+                                      }}
+                                      title="Отклонить"
+                                      style={{
+                                        padding: '6px 10px',
+                                        fontSize: '12px',
+                                        backgroundColor: '#e74c3c',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#c0392b';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#e74c3c';
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </>
+                                )}
+                                {transfer.status === 'approved' && (
+                                  <button
+                                    onClick={async () => {
+                                      await apiService.updateRequestStatus(String(transfer.id), 'in_transit', user?.id ? parseInt(String(user.id)) : 0);
+                                      const updatedRequests = await apiService.getRequests();
+                                      loadTransfers(updatedRequests);
+                                      showSuccess('Перемещение отправлено!');
+                                    }}
+                                    title="Отправить в путь"
+                                    style={{
+                                      padding: '6px 10px',
+                                      fontSize: '12px',
+                                      backgroundColor: '#9b59b6',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#8e44ad';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#9b59b6';
+                                    }}
+                                  >
+                                    📤
+                                  </button>
+                                )}
+                                {transfer.status === 'in_transit' && (
+                                  <button
+                                    onClick={async () => {
+                                      await apiService.updateRequestStatus(String(transfer.id), 'completed', user?.id ? parseInt(String(user.id)) : 0);
+                                      const updatedRequests = await apiService.getRequests();
+                                      loadTransfers(updatedRequests);
+                                      showSuccess('Перемещение завершено!');
+                                    }}
+                                    title="Завершить"
+                                    style={{
+                                      padding: '6px 10px',
+                                      fontSize: '12px',
+                                      backgroundColor: '#27ae60',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#229954';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#27ae60';
+                                    }}
+                                  >
+                                    ✓
+                                  </button>
+                                )}
+                                {transfer.status === 'rejected' && (
+                                  <button
+                                    onClick={async () => {
+                                      await apiService.updateRequestStatus(String(transfer.id), 'pending', user?.id ? parseInt(String(user.id)) : 0);
+                                      const updatedRequests = await apiService.getRequests();
+                                      loadTransfers(updatedRequests);
+                                      showSuccess('Заявка восстановлена!');
+                                    }}
+                                    title="Вернуть на рассмотрение"
+                                    style={{
+                                      padding: '6px 10px',
+                                      fontSize: '12px',
+                                      backgroundColor: '#f39c12',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#e67e22';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f39c12';
+                                    }}
+                                  >
+                                    ↻
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );

@@ -19,6 +19,7 @@ export const RequestsPage = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [formData, setFormData] = useState({
     requestType: 'transfer' as RequestType,
@@ -28,6 +29,17 @@ export const RequestsPage = () => {
     fromWarehouseId: undefined as number | undefined,
     toWarehouseId: undefined as number | undefined,
   });
+  const [editFormData, setEditFormData] = useState({
+    requestType: 'transfer' as RequestType,
+    notes: '',
+    priority: 'normal' as 'low' | 'normal' | 'high',
+    products: [] as RequestProduct[],
+    fromWarehouseId: undefined as number | undefined,
+    toWarehouseId: undefined as number | undefined,
+  });
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<number | undefined>();
+  const [selectedProductQuantity, setSelectedProductQuantity] = useState(1);
 
   const isAdmin = user?.role === 'admin';
 
@@ -101,49 +113,67 @@ export const RequestsPage = () => {
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user?.id) {
+      showError('Ошибка: пользователь не авторизован');
+      return;
+    }
+
     if (formData.products.length === 0) {
       showError('Добавьте товары в заявку!');
       return;
     }
 
     try {
-      if (selectedRequest && selectedRequest.status === 'pending') {
-        // Обновление существующей заявки
-        await apiService.updateRequest(selectedRequest.id, {
-          warehouseId: formData.fromWarehouseId || user?.warehouseId || 1,
-          transferWarehouseId: formData.toWarehouseId,
-          products: formData.products,
-          notes: formData.notes,
-          priority: formData.priority,
-          status: 'pending',
-        });
+      // Создание новой заявки на бэкенде
+      await apiService.createRequest({
+        requestType: formData.requestType,
+        status: 'pending',
+        warehouseId: formData.fromWarehouseId || user.warehouseId || 1,
+        transferWarehouseId: formData.toWarehouseId,
+        products: formData.products,
+        createdBy: String(user.id),
+        notes: formData.notes,
+        priority: formData.priority,
+      });
 
-        // Перезагружаем список заявок с бэкенда
-        const updatedRequests = await apiService.getRequests();
-        setRequests(updatedRequests);
-        showSuccess('Заявка успешно обновлена!');
-      } else {
-        // Создание новой заявки на бэкенде
-        const newRequest = await apiService.createRequest({
-          requestType: formData.requestType,
-          status: 'pending',
-          warehouseId: formData.fromWarehouseId || user?.warehouseId || 1,
-          transferWarehouseId: formData.toWarehouseId,
-          products: formData.products,
-          createdBy: user?.id || 'unknown',
-          notes: formData.notes,
-          priority: formData.priority,
-        });
-
-        // Перезагружаем список заявок с бэкенда
-        const updatedRequests = await apiService.getRequests();
-        setRequests(updatedRequests);
-        showSuccess('Заявка успешно создана!');
-      }
+      // Перезагружаем список заявок с бэкенда
+      const updatedRequests = await apiService.getRequests();
+      setRequests(updatedRequests);
+      showSuccess('Заявка успешно создана!');
       resetForm();
     } catch (error) {
-      console.error('Ошибка при создании/обновлении заявки:', error);
-      showError('Ошибка при создании/обновлении заявки');
+      console.error('Ошибка при создании заявки:', error);
+      showError('Ошибка при создании заявки');
+    }
+  };
+
+  const handleEditRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedRequest || editFormData.products.length === 0) {
+      showError('Добавьте товары в заявку!');
+      return;
+    }
+
+    try {
+      // Обновление существующей заявки
+      await apiService.updateRequest(selectedRequest.id, {
+        warehouseId: editFormData.fromWarehouseId || user?.warehouseId || 1,
+        transferWarehouseId: editFormData.toWarehouseId,
+        products: editFormData.products,
+        notes: editFormData.notes,
+        priority: editFormData.priority,
+        status: 'pending',
+      });
+
+      // Перезагружаем список заявок с бэкенда
+      const updatedRequests = await apiService.getRequests();
+      setRequests(updatedRequests);
+      showSuccess('Заявка успешно обновлена!');
+      resetEditForm();
+    } catch (error) {
+      console.error('Ошибка при обновлении заявки:', error);
+      showError('Ошибка при обновлении заявки');
     }
   };
 
@@ -156,8 +186,20 @@ export const RequestsPage = () => {
       fromWarehouseId: !isAdmin && user?.warehouseId ? user.warehouseId : undefined,
       toWarehouseId: undefined,
     });
-    setSelectedRequest(null);
     setShowForm(false);
+  };
+
+  const resetEditForm = () => {
+    setEditFormData({
+      requestType: 'transfer',
+      notes: '',
+      priority: 'normal',
+      products: [],
+      fromWarehouseId: undefined,
+      toWarehouseId: undefined,
+    });
+    setSelectedRequest(null);
+    setShowEditModal(false);
   };
 
   const generateTTN = async (request: Request) => {
@@ -340,9 +382,9 @@ export const RequestsPage = () => {
         );
         showSuccess(`Статус изменён на ${getStatusLabel(newStatus)}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Ошибка при обновлении статуса:', error);
-      const errorMessage = error.message || 'Ошибка при обновлении статуса';
+      const errorMessage = error instanceof Error ? error.message : 'Ошибка при обновлении статуса';
       showError(errorMessage);
     }
   };
@@ -383,7 +425,7 @@ export const RequestsPage = () => {
             onClick={async () => {
               const fullRequest = await apiService.getRequestById(request.id);
               if (fullRequest) {
-                setFormData({
+                setEditFormData({
                   requestType: fullRequest.requestType,
                   notes: fullRequest.notes || '',
                   priority: fullRequest.priority as 'low' | 'normal' | 'high',
@@ -392,7 +434,6 @@ export const RequestsPage = () => {
                   toWarehouseId: fullRequest.transferWarehouseId,
                 });
                 setSelectedRequest(fullRequest);
-                setShowForm(true);
               }
             }}
             className="btn-small btn-info"
@@ -1093,6 +1134,394 @@ export const RequestsPage = () => {
               >
                 Закрыть
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && selectedRequest && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+            overflowY: 'auto',
+          }}
+          onClick={() => resetEditForm()}
+        >
+          <div
+            style={{
+              backgroundColor: '#1e1e1e',
+              color: '#e0e0e0',
+              padding: '24px',
+              borderRadius: '8px',
+              maxWidth: '700px',
+              width: '90%',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              margin: '40px auto',
+              border: '1px solid #404040',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ margin: '0 0 20px 0', color: '#4ECDC4', fontSize: '20px' }}>
+              Редактирование заявки {selectedRequest.requestNumber}
+            </h2>
+
+            <form onSubmit={handleEditRequest} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Площадка отправления
+                  </label>
+                  <select
+                    value={editFormData.fromWarehouseId || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, fromWarehouseId: parseInt(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      border: '1px solid #404040',
+                      backgroundColor: '#2a2a2a',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                    }}
+                  >
+                    <option value="">Выберите площадку</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Площадка назначения
+                  </label>
+                  <select
+                    value={editFormData.toWarehouseId || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, toWarehouseId: parseInt(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      border: '1px solid #404040',
+                      backgroundColor: '#2a2a2a',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                    }}
+                  >
+                    <option value="">Выберите площадку</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Приоритет
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {(['low', 'normal', 'high'] as const).map((p) => (
+                    <label key={p} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="priority"
+                        value={p}
+                        checked={editFormData.priority === p}
+                        onChange={() => setEditFormData({ ...editFormData, priority: p })}
+                      />
+                      <span style={{ fontSize: '12px' }}>
+                        {p === 'high' ? 'Высокий' : p === 'normal' ? 'Обычный' : 'Низкий'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Примечания
+                </label>
+                <textarea
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  placeholder="Введите примечания..."
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '4px',
+                    border: '1px solid #404040',
+                    backgroundColor: '#2a2a2a',
+                    color: '#e0e0e0',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    minHeight: '80px',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                    Товары ({editFormData.products.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedProductId(undefined);
+                      setSelectedProductQuantity(1);
+                      setShowAddProductModal(true);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      backgroundColor: '#4ECDC4',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + Добавить товар
+                  </button>
+                </div>
+
+                {editFormData.products.length > 0 && (
+                  <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', marginBottom: '12px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #404040' }}>
+                        <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Товар</th>
+                        <th style={{ textAlign: 'right', padding: '8px', color: 'var(--text-secondary)' }}>Кол-во</th>
+                        <th style={{ textAlign: 'center', padding: '8px', color: 'var(--text-secondary)' }}>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editFormData.products.map((product, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #404040' }}>
+                          <td style={{ padding: '8px', color: '#e0e0e0' }}>{product.productName}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#e0e0e0' }}>
+                            {product.quantity} шт
+                          </td>
+                          <td style={{ padding: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditFormData({
+                                  ...editFormData,
+                                  products: editFormData.products.filter((_, i) => i !== idx),
+                                });
+                              }}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                backgroundColor: 'var(--accent-danger)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '3px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Удалить
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: '#4ECDC4',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                  }}
+                >
+                  Сохранить изменения
+                </button>
+                <button
+                  type="button"
+                  onClick={() => resetEditForm()}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: '#404040',
+                    color: '#e0e0e0',
+                    border: '1px solid #505050',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                  }}
+                >
+                  Отменить
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAddProductModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1002,
+          }}
+          onClick={() => setShowAddProductModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#1e1e1e',
+              color: '#e0e0e0',
+              padding: '24px',
+              borderRadius: '8px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              border: '1px solid #404040',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 20px 0', color: '#4ECDC4', fontSize: '18px' }}>
+              Добавить товар
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                  Выберите товар
+                </label>
+                <select
+                  value={selectedProductId || ''}
+                  onChange={(e) => setSelectedProductId(parseInt(e.target.value))}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '4px',
+                    border: '1px solid #404040',
+                    backgroundColor: '#2a2a2a',
+                    color: '#e0e0e0',
+                    fontSize: '14px',
+                  }}
+                >
+                  <option value="">-- Выберите товар --</option>
+                  {products
+                    .filter((product) => product.warehouseId === editFormData.fromWarehouseId)
+                    .map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} (ID: {product.id}) (Доступно: {product.quantity})
+                      </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                  Количество
+                </label>
+                <input
+                  type="number"
+                  value={selectedProductQuantity}
+                  onChange={(e) => setSelectedProductQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  min="1"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '4px',
+                    border: '1px solid #404040',
+                    backgroundColor: '#2a2a2a',
+                    color: '#e0e0e0',
+                    fontSize: '14px',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button
+                  onClick={() => {
+                    if (selectedProductId) {
+                      const product = products.find((p) => String(p.id) === String(selectedProductId));
+                      if (product) {
+                        setEditFormData({
+                          ...editFormData,
+                          products: [
+                            ...editFormData.products,
+                            {
+                              productId: product.id,
+                              productName: product.name,
+                              quantity: selectedProductQuantity,
+                              location: product.location,
+                            },
+                          ],
+                        });
+                        setShowAddProductModal(false);
+                      }
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: '#4ECDC4',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                  }}
+                >
+                  Добавить
+                </button>
+                <button
+                  onClick={() => setShowAddProductModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: '#404040',
+                    color: '#e0e0e0',
+                    border: '1px solid #505050',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                  }}
+                >
+                  Отменить
+                </button>
+              </div>
             </div>
           </div>
         </div>
