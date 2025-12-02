@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
 using WarehouseAPI.Services;
@@ -46,6 +47,7 @@ public class RequestsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<Request>> CreateRequest(Request request)
     {
         _context.Requests.Add(request);
@@ -57,11 +59,14 @@ public class RequestsController : ControllerBase
             .ThenInclude(rp => rp.Product)
             .FirstOrDefaultAsync(r => r.Id == request.Id);
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "CREATE",
             "Request",
             request.Id,
-            null,
+            userId,
             request.WarehouseId,
             description: $"Request {request.Id} created with status {request.Status}",
             logLevel: "INFO"
@@ -71,6 +76,7 @@ public class RequestsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> UpdateRequest(int id, Request request)
     {
         if (id != request.Id)
@@ -95,11 +101,14 @@ public class RequestsController : ControllerBase
         if (oldStatus != request.Status)
             description = $"Request {id} status changed from {oldStatus} to {request.Status}";
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "UPDATE",
             "Request",
             id,
-            null,
+            userId,
             request.WarehouseId,
             description: description,
             logLevel: "INFO"
@@ -324,6 +333,7 @@ public class RequestsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> DeleteRequest(int id)
     {
         var request = await _context.Requests.FindAsync(id);
@@ -333,11 +343,14 @@ public class RequestsController : ControllerBase
         _context.Requests.Remove(request);
         await _context.SaveChangesAsync();
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "DELETE",
             "Request",
             id,
-            null,
+            userId,
             request.WarehouseId,
             description: $"Request {id} with status {request.Status} deleted",
             logLevel: "WARNING"

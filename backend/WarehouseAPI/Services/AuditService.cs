@@ -1,4 +1,5 @@
 using log4net;
+using Microsoft.EntityFrameworkCore;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
 using System.Text.Json;
@@ -54,8 +55,16 @@ public class AuditService : IAuditService
             _context.AuditLogs.Add(auditLog);
             await _context.SaveChangesAsync();
 
-            // Log to file as well
-            LogToFile(action, entity, entityId, userId, warehouseId, description, logLevel);
+            // Log to file as well - fetch username from database
+            if (userId.HasValue)
+            {
+                var user = await _context.Users.FindAsync(userId.Value);
+                LogToFile(action, entity, entityId, userId, user?.Username ?? "Unknown", warehouseId, description, logLevel);
+            }
+            else
+            {
+                LogToFile(action, entity, entityId, userId, "System", warehouseId, description, logLevel);
+            }
         }
         catch (Exception ex)
         {
@@ -67,7 +76,10 @@ public class AuditService : IAuditService
     {
         try
         {
-            var query = _context.AuditLogs.AsQueryable();
+            var query = _context.AuditLogs
+                .Include(l => l.User)
+                .Include(l => l.Warehouse)
+                .AsQueryable();
 
             // User can see their own logs
             if (userId_filter.HasValue)
@@ -98,7 +110,10 @@ public class AuditService : IAuditService
     {
         try
         {
-            var query = _context.AuditLogs.AsQueryable();
+            var query = _context.AuditLogs
+                .Include(l => l.User)
+                .Include(l => l.Warehouse)
+                .AsQueryable();
 
             if (warehouseId.HasValue)
             {
@@ -119,9 +134,9 @@ public class AuditService : IAuditService
         }
     }
 
-    private void LogToFile(string action, string entity, int? entityId, int? userId, int? warehouseId, string? description, string logLevel)
+    private void LogToFile(string action, string entity, int? entityId, int? userId, string? username, int? warehouseId, string? description, string logLevel)
     {
-        var message = $"[{action}] {entity}(ID:{entityId}) by User:{userId} in Warehouse:{warehouseId} - {description}";
+        var message = $"[{action}] {entity}(ID:{entityId}) by User:{username ?? "Unknown"} in Warehouse:{warehouseId} - {description}";
 
         switch (logLevel.ToUpper())
         {

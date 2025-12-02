@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
 using WarehouseAPI.Services;
@@ -46,6 +47,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<Product>> CreateProduct(CreateProductRequest request)
     {
         var product = new Product
@@ -65,11 +67,15 @@ public class ProductsController : ControllerBase
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
 
+        // Get userId from JWT token
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "CREATE",
             "Product",
             product.Id,
-            null,
+            userId,
             product.WarehouseId,
             description: $"Product {product.Name} (SKU: {product.Sku}) created with price {product.Price}",
             logLevel: "INFO"
@@ -79,6 +85,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> UpdateProduct(int id, UpdateProductRequest request)
     {
         var product = await _context.Products.FindAsync(id);
@@ -103,11 +110,15 @@ public class ProductsController : ControllerBase
 
         var newValues = new { product.Name, product.Sku, product.Price, product.Quantity, product.Location };
         
+        // Get userId from JWT token
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "UPDATE",
             "Product",
             id,
-            null,
+            userId,
             product.WarehouseId,
             description: $"Product {product.Name} updated",
             logLevel: "INFO"
@@ -117,6 +128,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> DeleteProduct(int id)
     {
         var product = await _context.Products.FindAsync(id);
@@ -126,11 +138,15 @@ public class ProductsController : ControllerBase
         _context.Products.Remove(product);
         await _context.SaveChangesAsync();
 
+        // Get userId from JWT token
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "DELETE",
             "Product",
             id,
-            null,
+            userId,
             product.WarehouseId,
             description: $"Product {product.Name} deleted",
             logLevel: "WARNING"

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
+using WarehouseAPI.Services;
 
 namespace WarehouseAPI.Controllers;
 
@@ -10,10 +12,12 @@ namespace WarehouseAPI.Controllers;
 public class CategoriesController : ControllerBase
 {
     private readonly WarehouseContext _context;
+    private readonly IAuditService _auditService;
 
-    public CategoriesController(WarehouseContext context)
+    public CategoriesController(WarehouseContext context, IAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -36,6 +40,7 @@ public class CategoriesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<Category>> CreateCategory(CreateCategoryRequest request)
     {
         var category = new Category
@@ -47,10 +52,24 @@ public class CategoriesController : ControllerBase
         _context.Categories.Add(category);
         await _context.SaveChangesAsync();
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "CREATE",
+            "Category",
+            category.Id,
+            userId,
+            null,
+            description: $"Category {category.Name} created",
+            logLevel: "INFO"
+        );
+
         return CreatedAtAction(nameof(GetCategory), new { id = category.Id }, category);
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> UpdateCategory(int id, UpdateCategoryRequest request)
     {
         var category = await _context.Categories.FindAsync(id);
@@ -62,10 +81,25 @@ public class CategoriesController : ControllerBase
         category.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "UPDATE",
+            "Category",
+            id,
+            userId,
+            null,
+            description: $"Category {category.Name} updated",
+            logLevel: "INFO"
+        );
+
         return NoContent();
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> DeleteCategory(int id)
     {
         var category = await _context.Categories
@@ -81,6 +115,20 @@ public class CategoriesController : ControllerBase
 
         _context.Categories.Remove(category);
         await _context.SaveChangesAsync();
+
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "DELETE",
+            "Category",
+            id,
+            userId,
+            null,
+            description: $"Category {category.Name} deleted",
+            logLevel: "INFO"
+        );
+
         return NoContent();
     }
 }

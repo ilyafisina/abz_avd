@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
+using WarehouseAPI.Services;
 
 namespace WarehouseAPI.Controllers;
 
@@ -10,10 +12,12 @@ namespace WarehouseAPI.Controllers;
 public class TransferProductsController : ControllerBase
 {
     private readonly WarehouseContext _context;
+    private readonly IAuditService _auditService;
 
-    public TransferProductsController(WarehouseContext context)
+    public TransferProductsController(WarehouseContext context, IAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -41,6 +45,7 @@ public class TransferProductsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<TransferProduct>> AddProductToTransfer(
         int transferId,
         [FromBody] AddProductRequest request)
@@ -63,11 +68,25 @@ public class TransferProductsController : ControllerBase
         _context.TransferProducts.Add(transferProduct);
         await _context.SaveChangesAsync();
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "CREATE",
+            "TransferProduct",
+            transferProduct.ProductId,
+            userId,
+            transfer.FromWarehouseId,
+            description: $"Product {product.Name} (qty: {request.Quantity}) added to transfer {transferId}",
+            logLevel: "INFO"
+        );
+
         return CreatedAtAction(nameof(GetTransferProduct),
             new { transferId, productId = request.ProductId }, transferProduct);
     }
 
     [HttpPut("{productId}")]
+    [Authorize]
     public async Task<IActionResult> UpdateTransferProduct(
         int transferId,
         int productId,
@@ -79,15 +98,32 @@ public class TransferProductsController : ControllerBase
         if (transferProduct == null)
             return NotFound();
 
+        var transfer = await _context.Transfers.FindAsync(transferId);
+
         transferProduct.Quantity = request.Quantity;
         transferProduct.ReceivedQuantity = request.ReceivedQuantity;
         transferProduct.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "UPDATE",
+            "TransferProduct",
+            productId,
+            userId,
+            transfer?.FromWarehouseId,
+            description: $"Product {productId} in transfer {transferId} updated",
+            logLevel: "INFO"
+        );
+
         return NoContent();
     }
 
     [HttpDelete("{productId}")]
+    [Authorize]
     public async Task<IActionResult> RemoveProductFromTransfer(int transferId, int productId)
     {
         var transferProduct = await _context.TransferProducts
@@ -96,8 +132,24 @@ public class TransferProductsController : ControllerBase
         if (transferProduct == null)
             return NotFound();
 
+        var transfer = await _context.Transfers.FindAsync(transferId);
+
         _context.TransferProducts.Remove(transferProduct);
         await _context.SaveChangesAsync();
+
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "DELETE",
+            "TransferProduct",
+            productId,
+            userId,
+            transfer?.FromWarehouseId,
+            description: $"Product {productId} removed from transfer {transferId}",
+            logLevel: "INFO"
+        );
+
         return NoContent();
     }
 }

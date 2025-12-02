@@ -1,5 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
 using WarehouseAPI.Services;
@@ -87,6 +92,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<User>> CreateUser(User user)
     {
         user.PasswordHash = HashPassword(user.PasswordHash);
@@ -95,11 +101,14 @@ public class UsersController : ControllerBase
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
         
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "CREATE",
             "User",
             user.Id,
-            null,
+            userId,
             user.WarehouseId,
             description: $"User {user.Username} ({user.Email}) created",
             logLevel: "INFO"
@@ -109,6 +118,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> UpdateUser(int id, User user)
     {
         if (id != user.Id)
@@ -153,13 +163,16 @@ public class UsersController : ControllerBase
             throw;
         }
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         var newValues = new { existingUser.Username, existingUser.Email, existingUser.Role, existingUser.FirstName, existingUser.LastName };
         
         await _auditService.LogActionAsync(
             "UPDATE",
             "User",
             id,
-            null,
+            userId,
             existingUser.WarehouseId,
             description: $"User {existingUser.Username} updated",
             logLevel: "INFO"
@@ -169,6 +182,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> DeleteUser(int id)
     {
         var user = await _context.Users.FindAsync(id);
@@ -178,11 +192,14 @@ public class UsersController : ControllerBase
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
         
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "DELETE",
             "User",
             id,
-            null,
+            userId,
             user.WarehouseId,
             description: $"User {user.Username} deleted",
             logLevel: "WARNING"
@@ -217,11 +234,24 @@ public class UsersController : ControllerBase
 
     private string GenerateToken(int userId, string username, string role)
     {
-        // Простой токен для текущей реализации
-        // В продакшене нужно использовать JWT
-        return System.Convert.ToBase64String(
-            System.Text.Encoding.UTF8.GetBytes($"{userId}:{username}:{role}:{DateTime.UtcNow.Ticks}")
+        var secretKey = "your-secret-key-here-minimum-32-characters-required";
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(ClaimTypes.Name, username),
+            new Claim(ClaimTypes.Role, role)
+        };
+
+        var token = new JwtSecurityToken(
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(24),
+            signingCredentials: credentials
         );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
 

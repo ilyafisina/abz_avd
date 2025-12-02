@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
+using WarehouseAPI.Services;
 
 namespace WarehouseAPI.Controllers;
 
@@ -10,10 +12,12 @@ namespace WarehouseAPI.Controllers;
 public class TransfersController : ControllerBase
 {
     private readonly WarehouseContext _context;
+    private readonly IAuditService _auditService;
 
-    public TransfersController(WarehouseContext context)
+    public TransfersController(WarehouseContext context, IAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -59,6 +63,7 @@ public class TransfersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<Transfer>> CreateTransfer([FromBody] CreateTransferRequest request)
     {
         var transfer = new Transfer
@@ -71,10 +76,25 @@ public class TransfersController : ControllerBase
 
         _context.Transfers.Add(transfer);
         await _context.SaveChangesAsync();
+
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "CREATE",
+            "Transfer",
+            transfer.Id,
+            userId,
+            transfer.FromWarehouseId,
+            description: $"Transfer {transfer.Id} created from warehouse {transfer.FromWarehouseId} to {transfer.ToWarehouseId}",
+            logLevel: "INFO"
+        );
+
         return CreatedAtAction(nameof(GetTransfer), new { id = transfer.Id }, transfer);
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> UpdateTransfer(int id, Transfer transfer)
     {
         if (id != transfer.Id)
@@ -91,6 +111,20 @@ public class TransfersController : ControllerBase
                 return NotFound();
             throw;
         }
+
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "UPDATE",
+            "Transfer",
+            id,
+            userId,
+            transfer.FromWarehouseId,
+            description: $"Transfer {id} updated",
+            logLevel: "INFO"
+        );
+
         return NoContent();
     }
 
@@ -114,6 +148,7 @@ public class TransfersController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> DeleteTransfer(int id)
     {
         var transfer = await _context.Transfers.FindAsync(id);
@@ -122,6 +157,20 @@ public class TransfersController : ControllerBase
 
         _context.Transfers.Remove(transfer);
         await _context.SaveChangesAsync();
+
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
+        await _auditService.LogActionAsync(
+            "DELETE",
+            "Transfer",
+            id,
+            userId,
+            transfer.FromWarehouseId,
+            description: $"Transfer {id} deleted",
+            logLevel: "WARNING"
+        );
+
         return NoContent();
     }
 

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
 using WarehouseAPI.Services;
@@ -35,6 +36,7 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<Warehouse>> CreateWarehouse([FromBody] Warehouse warehouse)
     {
         if (string.IsNullOrWhiteSpace(warehouse.Name) || string.IsNullOrWhiteSpace(warehouse.Location))
@@ -43,11 +45,14 @@ public class WarehousesController : ControllerBase
         _context.Warehouses.Add(warehouse);
         await _context.SaveChangesAsync();
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "CREATE",
             "Warehouse",
             warehouse.Id,
-            null,
+            userId,
             warehouse.Id,
             description: $"Warehouse {warehouse.Name} at {warehouse.Location} created",
             logLevel: "INFO"
@@ -57,6 +62,7 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> UpdateWarehouse(int id, Warehouse warehouse)
     {
         if (id != warehouse.Id)
@@ -74,11 +80,14 @@ public class WarehousesController : ControllerBase
             throw;
         }
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "UPDATE",
             "Warehouse",
             id,
-            null,
+            userId,
             id,
             description: $"Warehouse {warehouse.Name} updated",
             logLevel: "INFO"
@@ -88,6 +97,7 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> DeleteWarehouse(int id)
     {
         var warehouse = await _context.Warehouses.FindAsync(id);
@@ -97,11 +107,14 @@ public class WarehousesController : ControllerBase
         _context.Warehouses.Remove(warehouse);
         await _context.SaveChangesAsync();
 
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
+
         await _auditService.LogActionAsync(
             "DELETE",
             "Warehouse",
             id,
-            null,
+            userId,
             id,
             description: $"Warehouse {warehouse.Name} deleted",
             logLevel: "WARNING"
