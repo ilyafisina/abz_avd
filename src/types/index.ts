@@ -153,6 +153,24 @@ export interface AuthSession {
   expiresAt: Date;
 }
 
+// Интерфейс перемещения между площадками
+export interface Transfer {
+  id: number;
+  fromWarehouseId: number;
+  toWarehouseId?: number;
+  startedAt?: Date | string;
+  completedAt?: Date | string;
+  status?: RequestStatus;
+  products?: RequestProduct[];
+  createdBy?: string | number;
+  createdByUser?: User;
+  approvedBy?: string | number;
+  approvedByUser?: User;
+  completedBy?: string | number;
+  completedByUser?: User;
+  [key: string]: unknown;
+}
+
 // Интерфейс параметров перемещения товара
 export interface MovementData {
   productId: string;

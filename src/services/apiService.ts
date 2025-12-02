@@ -380,6 +380,10 @@ class ApiService {
         products: products,
         createdBy: String(r.userId),
         createdAt: new Date(r.createdAt),
+        approvedBy: r.approvedBy ? String(r.approvedBy) : undefined,
+        approvedAt: r.approvedAt ? new Date(r.approvedAt) : undefined,
+        completedBy: r.completedBy ? String(r.completedBy) : undefined,
+        completedAt: r.completedAt ? new Date(r.completedAt) : undefined,
         priority: 'normal',
         notes: r.notes,
       };
@@ -414,6 +418,10 @@ class ApiService {
         products: products,
         createdBy: String(data.userId),
         createdAt: new Date(data.createdAt),
+        approvedBy: data.approvedBy ? String(data.approvedBy) : undefined,
+        approvedAt: data.approvedAt ? new Date(data.approvedAt) : undefined,
+        completedBy: data.completedBy ? String(data.completedBy) : undefined,
+        completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
         priority: 'normal',
         notes: data.notes,
       };
@@ -474,6 +482,49 @@ class ApiService {
       priority: request.priority,
       notes: data.notes,
     };
+  }
+
+  async updateRequest(id: string, request: Partial<Request>): Promise<Request | undefined> {
+    // Обновляем основные поля Request
+    const data = await this.fetchApi<any>(`/requests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        id: parseInt(id),
+        warehouseId: request.warehouseId,
+        transferWarehouseId: request.transferWarehouseId,
+        status: request.status,
+        notes: request.notes,
+        priority: request.priority,
+      }),
+    });
+
+    // Если обновляем товары - нужно удалить старые и добавить новые
+    if (request.products && request.products.length > 0) {
+      // Сначала удаляем все старые товары
+      const existingRequest = await this.getRequestById(id);
+      if (existingRequest?.products) {
+        for (const product of existingRequest.products) {
+          await this.fetchApi(`/requests/${id}/products/${product.productId}`, {
+            method: 'DELETE',
+          });
+        }
+      }
+
+      // Теперь добавляем новые товары
+      for (const product of request.products) {
+        await this.fetchApi(`/requests/${id}/products`, {
+          method: 'POST',
+          body: JSON.stringify({
+            productId: parseInt(String(product.productId)),
+            quantity: product.quantity,
+          }),
+        });
+      }
+    }
+
+    // Загружаем обновленную заявку с товарами
+    const updated = await this.getRequestById(id);
+    return updated;
   }
 
   async updateRequestStatus(id: string, status: Request['status'], loggedInUserId: number): Promise<Request | undefined> {

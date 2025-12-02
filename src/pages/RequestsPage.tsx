@@ -108,7 +108,17 @@ export const RequestsPage = () => {
 
     try {
       if (selectedRequest && selectedRequest.status === 'pending') {
-        // Обновление существующей заявки - перезагружаем с бэкенда
+        // Обновление существующей заявки
+        await apiService.updateRequest(selectedRequest.id, {
+          warehouseId: formData.fromWarehouseId || user?.warehouseId || 1,
+          transferWarehouseId: formData.toWarehouseId,
+          products: formData.products,
+          notes: formData.notes,
+          priority: formData.priority,
+          status: 'pending',
+        });
+
+        // Перезагружаем список заявок с бэкенда
         const updatedRequests = await apiService.getRequests();
         setRequests(updatedRequests);
         showSuccess('Заявка успешно обновлена!');

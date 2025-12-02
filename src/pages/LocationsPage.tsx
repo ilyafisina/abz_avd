@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/useAuth';
 import { useNotification } from '../contexts/useNotification';
-import type { Product, Warehouse, User } from '../types';
+import type { Product, Warehouse, User, Transfer, RequestProduct, RequestType, Request } from '../types';
 import type { Category } from '../types';
 import { apiService } from '../services/apiService';
 import { EditProductModal } from '../components/EditProductModal';
@@ -25,15 +25,6 @@ export const LocationsPage = () => {
   const [newWarehouseForm, setNewWarehouseForm] = useState({
     name: '',
     location: '',
-  });
-
-  // Форма перемещения товаров (для админа)
-  const [showTransferForm, setShowTransferForm] = useState(false);
-  const [transferForm, setTransferForm] = useState({
-    productId: '',
-    quantity: 0,
-    targetWarehouseId: '',
-    notes: '',
   });
 
   // Форма редактирования товара
@@ -65,12 +56,15 @@ export const LocationsPage = () => {
     location: '',
   });
 
-  // Форма создания заявки на перемещение (новая форма для админа в Местоположениях)
+  // Форма создания заявки на перемещение (как у менеджера)
   const [showCreateRequestForm, setShowCreateRequestForm] = useState(false);
-  const [createRequestForm, setCreateRequestForm] = useState({
-    products: [] as Array<{ productId: string; quantity: number }>,
-    targetWarehouseId: '',
+  const [formData, setFormData] = useState({
+    requestType: 'transfer' as RequestType,
     notes: '',
+    priority: 'normal' as 'low' | 'normal' | 'high',
+    products: [] as RequestProduct[],
+    fromWarehouseId: undefined as number | undefined,
+    toWarehouseId: undefined as number | undefined,
   });
   
   const [categories, setCategories] = useState<Category[]>([]);
@@ -81,7 +75,11 @@ export const LocationsPage = () => {
     quantity: 'all',
     searchProduct: '',
   });
-  const [transfers, setTransfers] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [transferFilters, setTransferFilters] = useState({
+    type: 'all', // all, incoming, outgoing
+    searchProduct: '',
+  });
 
   const pdfRef = useRef<HTMLDivElement>(null);
   const isAdmin = user?.role === 'admin';
@@ -91,17 +89,40 @@ export const LocationsPage = () => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [productsData, warehousesData, categoriesData, usersData, transfersData] = await Promise.all([
+        const [productsData, warehousesData, categoriesData, usersData, requestsData] = await Promise.all([
           apiService.getProducts(),
           apiService.getWarehouses(),
           apiService.getCategories(),
           apiService.getUsers(),
-          apiService.getTransfers(),
+          apiService.getRequests(),
         ]);
         setProducts(productsData);
         setWarehouses(warehousesData);
         setCategories(categoriesData);
         setUsers(usersData);
+        
+        // Преобразуем Requests в формат Transfers для отображения
+        const transfersData = requestsData.map((req: Request) => {
+          const createdUser = usersData.find((u: User) => String(u.id) === String(req.createdBy));
+          const approvedUser = req.approvedBy ? usersData.find((u: User) => String(u.id) === String(req.approvedBy)) : undefined;
+          const completedUser = req.completedBy ? usersData.find((u: User) => String(u.id) === String(req.completedBy)) : undefined;
+          
+          return {
+            id: Number(req.id),
+            fromWarehouseId: req.warehouseId,
+            toWarehouseId: req.transferWarehouseId,
+            startedAt: req.createdAt,
+            completedAt: req.completedAt,
+            status: req.status,
+            products: req.products || [],
+            createdBy: req.createdBy,
+            createdByUser: createdUser,
+            approvedBy: req.approvedBy,
+            approvedByUser: approvedUser,
+            completedBy: req.completedBy,
+            completedByUser: completedUser,
+          };
+        });
         setTransfers(transfersData || []);
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);
@@ -298,116 +319,44 @@ export const LocationsPage = () => {
     }
   };
 
-  const handleTransfer = async () => {
-    if (!transferForm.productId || !transferForm.targetWarehouseId || transferForm.quantity <= 0) {
-      showError('Заполните все поля корректно');
-      return;
-    }
+  const handleCreateRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-    const product = products.find(p => p.id === transferForm.productId);
-    if (!product) {
-      showError('Товар не найден');
-      return;
-    }
-
-    if (product.quantity < transferForm.quantity) {
-      showError('Недостаточно товара на складе');
+    if (formData.products.length === 0) {
+      showError('Добавьте товары в заявку!');
       return;
     }
 
     try {
       await apiService.createRequest({
-        requestType: 'transfer',
+        requestType: formData.requestType,
         status: 'pending',
-        warehouseId: selectedWarehouse || 1,
-        transferWarehouseId: parseInt(transferForm.targetWarehouseId),
-        products: [
-          {
-            productId: product.id,
-            productName: product.name,
-            quantity: transferForm.quantity,
-          },
-        ],
-        createdBy: user?.id || '3',
-        priority: 'normal',
-        notes: transferForm.notes || 'Перемещение товара между площадками',
+        warehouseId: formData.fromWarehouseId || selectedWarehouse || 1,
+        transferWarehouseId: formData.toWarehouseId,
+        products: formData.products,
+        createdBy: user?.id || 'unknown',
+        notes: formData.notes,
+        priority: formData.priority,
       });
-      setShowTransferForm(false);
-      setTransferForm({ productId: '', quantity: 0, targetWarehouseId: '', notes: '' });
-      showSuccess('Заявка на перемещение создана успешно');
+
+      showSuccess('Заявка успешно создана!');
+      resetForm();
     } catch (error) {
       console.error('Ошибка при создании заявки:', error);
-      showError('Не удалось создать заявку');
+      showError('Ошибка при создании заявки');
     }
   };
 
-  const handleCreateRequest = async () => {
-    if (createRequestForm.products.length === 0 || !createRequestForm.targetWarehouseId) {
-      showError('Выберите товары и целевую площадку');
-      return;
-    }
-
-    // Проверяем что все товары имеют корректное количество
-    if (createRequestForm.products.some(p => p.quantity <= 0)) {
-      showError('Все товары должны иметь количество больше нуля');
-      return;
-    }
-
-    try {
-      const productsList = createRequestForm.products.map(p => {
-        const product = getWarehouseProducts(selectedWarehouse!).find(prod => prod.id === p.productId);
-        return {
-          productId: p.productId,
-          productName: product?.name || '',
-          quantity: p.quantity,
-        };
-      });
-
-      await apiService.createRequest({
-        requestType: 'transfer',
-        status: 'pending',
-        warehouseId: selectedWarehouse || 1,
-        transferWarehouseId: parseInt(createRequestForm.targetWarehouseId),
-        products: productsList,
-        createdBy: user?.id || '3',
-        priority: 'normal',
-        notes: createRequestForm.notes || '',
-      });
-      
-      setShowCreateRequestForm(false);
-      setCreateRequestForm({ products: [], targetWarehouseId: '', notes: '' });
-      showSuccess('Заявка на перемещение создана успешно');
-    } catch (error) {
-      console.error('Ошибка при создании заявки:', error);
-      showError('Не удалось создать заявку');
-    }
-  };
-
-  const addProductToRequest = (productId: string) => {
-    if (createRequestForm.products.find(p => p.productId === productId)) {
-      showError('Товар уже добавлен');
-      return;
-    }
-    setCreateRequestForm({
-      ...createRequestForm,
-      products: [...createRequestForm.products, { productId, quantity: 1 }],
+  const resetForm = () => {
+    setFormData({
+      requestType: 'transfer',
+      notes: '',
+      priority: 'normal',
+      products: [],
+      fromWarehouseId: selectedWarehouse || undefined,
+      toWarehouseId: undefined,
     });
-  };
-
-  const removeProductFromRequest = (productId: string) => {
-    setCreateRequestForm({
-      ...createRequestForm,
-      products: createRequestForm.products.filter(p => p.productId !== productId),
-    });
-  };
-
-  const updateRequestProductQuantity = (productId: string, quantity: number) => {
-    setCreateRequestForm({
-      ...createRequestForm,
-      products: createRequestForm.products.map(p =>
-        p.productId === productId ? { ...p, quantity } : p
-      ),
-    });
+    setShowCreateRequestForm(false);
   };
 
   const exportToPDF = async (warehouse: Warehouse) => {
@@ -724,141 +673,6 @@ export const LocationsPage = () => {
         </div>
         )}
 
-        {/* Для администратора - форма перемещения товаров */}
-        {isAdmin && (
-          <div className="card-plain" style={{ marginTop: '20px' }}>
-            <h3 className="no-margin">Перемещение товаров между площадками</h3>
-            
-            <button
-              onClick={() => setShowTransferForm(!showTransferForm)}
-              style={{
-                marginTop: '16px',
-                padding: '10px 16px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: 'var(--primary-blue)',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontWeight: '500',
-              }}
-              >
-              {showTransferForm ? '✕ Отменить' : '+ Создать заявку на перемещение'}
-            </button>
-
-            {showTransferForm && (
-              <div style={{
-                marginTop: '16px',
-                padding: '16px',
-                backgroundColor: 'var(--surface-secondary)',
-                borderRadius: '8px',
-                border: '1px solid var(--border-primary)',
-              }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Товар для перемещения</label>
-                    <select
-                      value={transferForm.productId}
-                      onChange={(e) => setTransferForm({ ...transferForm, productId: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      <option value="">Выберите товар</option>
-                      {warehouseProducts.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} (осталось: {p.quantity})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Количество</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={transferForm.quantity}
-                      onChange={(e) => setTransferForm({ ...transferForm, quantity: parseInt(e.target.value) || 0 })}
-                      placeholder="Введите количество"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>На какую площадку переместить</label>
-                    <select
-                      value={transferForm.targetWarehouseId}
-                      onChange={(e) => setTransferForm({ ...transferForm, targetWarehouseId: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      <option value="">Выберите целевую площадку</option>
-                      {warehouses.filter(w => w.id !== selectedWarehouse).map(w => (
-                        <option key={w.id} value={w.id}>
-                          {w.name} - {w.location}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Примечание (опционально)</label>
-                    <textarea
-                      value={transferForm.notes}
-                      onChange={(e) => setTransferForm({ ...transferForm, notes: e.target.value })}
-                      placeholder="Причина перемещения..."
-                      rows={2}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                        fontFamily: 'inherit',
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleTransfer}
-                  style={{
-                    marginTop: '16px',
-                    padding: '10px 20px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'var(--primary-blue)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                  }}
-                >
-                  Создать заявку на перемещение
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Для администратора - форма добавления нового товара (встроена в фильтры) */}
         {isAdmin && activeTab === 'products' && showAddProductForm && (
           <div style={{
@@ -1060,162 +874,261 @@ export const LocationsPage = () => {
           </div>
         )}
 
-        {/* Форма создания заявки на перемещение (встроена в фильтры) */}
-        {isAdmin && activeTab === 'products' && showCreateRequestForm && (
-          <div style={{
-            marginTop: '16px',
-            padding: '16px',
-            backgroundColor: 'var(--surface-secondary)',
-            borderRadius: '8px',
-            border: '1px solid var(--border-primary)',
-          }}>
-            <h4 style={{ marginBottom: '16px' }}>Создать заявку на перемещение</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Целевая площадка *</label>
-                <select
-                  value={createRequestForm.targetWarehouseId}
-                  onChange={(e) => setCreateRequestForm({ ...createRequestForm, targetWarehouseId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-primary)',
-                    backgroundColor: 'var(--surface-primary)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <option value="">Выберите целевую площадку</option>
-                  {warehouses.filter(w => w.id !== selectedWarehouse).map(w => (
-                    <option key={w.id} value={w.id}>
-                      {w.name} - {w.location}
-                    </option>
-                  ))}
-                </select>
-              </div>
+        {/* Форма создания заявки на перемещение (как у менеджера в RequestsPage) */}
+        {isAdmin && showCreateRequestForm && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{
+              padding: '16px',
+              backgroundColor: 'var(--surface-secondary)',
+              borderRadius: '8px',
+              border: '1px solid var(--border-primary)',
+            }}>
+              <h4 style={{ marginBottom: '16px' }}>Создать новую заявку на перемещение</h4>
+              <form onSubmit={handleCreateRequest}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>Приоритет *</label>
+                    <select
+                      value={formData.priority}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value as 'low' | 'normal' | 'high' })}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <option value="low">Низкий</option>
+                      <option value="normal">Обычный</option>
+                      <option value="high">Высокий</option>
+                    </select>
+                  </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Добавить товар</label>
-                <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      addProductToRequest(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-primary)',
-                    backgroundColor: 'var(--surface-primary)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <option value="">Выберите товар</option>
-                  {warehouseProducts
-                    .filter(p => !createRequestForm.products.find(rp => rp.productId === p.id))
-                    .map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (осталось: {p.quantity})
-                      </option>
-                    ))}
-                </select>
-              </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>От площадки *</label>
+                    <select
+                      value={formData.fromWarehouseId || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          fromWarehouseId: e.target.value ? parseInt(e.target.value) : undefined,
+                        })
+                      }
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <option value="">Выберите площадку</option>
+                      {warehouses.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>На площадку *</label>
+                    <select
+                      value={formData.toWarehouseId || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          toWarehouseId: e.target.value ? parseInt(e.target.value) : undefined,
+                        })
+                      }
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <option value="">Выберите площадку</option>
+                      {warehouses
+                        .filter((w) => w.id !== formData.fromWarehouseId)
+                        .map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>Примечания</label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Дополнительные примечания..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        minHeight: '80px',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: '1 / -1', padding: '12px', backgroundColor: 'var(--surface-tertiary)', borderRadius: '4px' }}>
+                    <p style={{ marginBottom: '12px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                      Товары в заявке: {formData.products.length}
+                    </p>
+                    
+                    <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: 'var(--surface-primary)', borderRadius: '4px', border: '1px solid var(--border-primary)' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '12px', color: 'var(--text-primary)' }}>Добавить товар:</label>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                        <select
+                          id="productSelect"
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-primary)',
+                            fontSize: '12px',
+                            backgroundColor: 'var(--surface-primary)',
+                            color: 'var(--text-primary)',
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          <option value="">-- Выберите товар --</option>
+                          {products
+                            .filter(p => !formData.fromWarehouseId || p.warehouseId === formData.fromWarehouseId)
+                            .filter(p => !formData.products.find(rp => rp.productId === p.id))
+                            .map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.name} (Кол-во: {product.quantity})
+                              </option>
+                            ))}
+                        </select>
+                        <input
+                          type="number"
+                          id="productQty"
+                          min="1"
+                          defaultValue="1"
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-primary)',
+                            fontSize: '12px',
+                            backgroundColor: 'var(--surface-primary)',
+                            color: 'var(--text-primary)',
+                            fontFamily: 'inherit',
+                          }}
+                          placeholder="Кол-во"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const selectEl = document.getElementById('productSelect') as HTMLSelectElement;
+                            const qtyEl = document.getElementById('productQty') as HTMLInputElement;
+                            const selectedProductId = selectEl?.value;
+                            const quantity = parseInt(qtyEl?.value || '1');
+
+                            if (selectedProductId) {
+                              const product = products.find(p => p.id === selectedProductId);
+                              if (product) {
+                                setFormData({
+                                  ...formData,
+                                  products: [
+                                    ...formData.products,
+                                    {
+                                      productId: product.id,
+                                      productName: product.name,
+                                      quantity: quantity,
+                                      location: product.location,
+                                    },
+                                  ],
+                                });
+                                selectEl.value = '';
+                                qtyEl.value = '1';
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            backgroundColor: 'var(--accent-primary)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Добавить в заявку
+                        </button>
+                      </div>
+                    </div>
+
+                    {formData.products.length > 0 && (
+                      <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                            <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Товар</th>
+                            <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Кол-во</th>
+                            <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Место</th>
+                            <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Действие</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {formData.products.map((product, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                              <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{product.productName}</td>
+                              <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{product.quantity}</td>
+                              <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{product.location || '-'}</td>
+                              <td style={{ padding: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      products: formData.products.filter((_, i) => i !== idx),
+                                    });
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    backgroundColor: 'var(--accent-danger)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '3px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Удалить
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+
+                <button type="submit" style={{ width: '100%', marginTop: '16px', padding: '10px 20px', borderRadius: '6px', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#ffffff', cursor: 'pointer', fontWeight: '500' }}>
+                  Создать заявку
+                </button>
+              </form>
             </div>
-
-            {/* Список выбранных товаров */}
-            {createRequestForm.products.length > 0 && (
-              <div style={{ marginTop: '16px', border: '1px solid var(--border-primary)', borderRadius: '6px', overflow: 'hidden' }}>
-                <table style={{ width: '100%' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'var(--surface-tertiary)' }}>
-                      <th style={{ padding: '12px', textAlign: 'left' }}>Товар</th>
-                      <th style={{ padding: '12px', textAlign: 'center' }}>Количество</th>
-                      <th style={{ padding: '12px', textAlign: 'center' }}>Действие</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {createRequestForm.products.map(p => {
-                      const product = warehouseProducts.find(prod => prod.id === p.productId);
-                      return (
-                        <tr key={p.productId} style={{ borderTop: '1px solid var(--border-primary)' }}>
-                          <td style={{ padding: '12px' }}>{product?.name}</td>
-                          <td style={{ padding: '12px' }}>
-                            <input
-                              type="number"
-                              min="1"
-                              max={product?.quantity}
-                              value={p.quantity}
-                              onChange={(e) => updateRequestProductQuantity(p.productId, parseInt(e.target.value) || 1)}
-                              style={{
-                                width: '80px',
-                                padding: '6px 8px',
-                                borderRadius: '4px',
-                                border: '1px solid var(--border-primary)',
-                                backgroundColor: 'var(--surface-primary)',
-                                color: 'var(--text-primary)',
-                              }}
-                            />
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <button
-                              onClick={() => removeProductFromRequest(p.productId)}
-                              style={{
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                border: 'none',
-                                backgroundColor: '#e74c3c',
-                                color: '#ffffff',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                              }}
-                            >
-                              Удалить
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <div style={{ marginTop: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Примечание (опционально)</label>
-              <textarea
-                value={createRequestForm.notes}
-                onChange={(e) => setCreateRequestForm({ ...createRequestForm, notes: e.target.value })}
-                placeholder="Добавить примечание к заявке"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-primary)',
-                  backgroundColor: 'var(--surface-primary)',
-                  color: 'var(--text-primary)',
-                  minHeight: '80px',
-                  fontFamily: 'inherit',
-                }}
-              />
-            </div>
-
-            <button
-              onClick={handleCreateRequest}
-              style={{
-                marginTop: '16px',
-                padding: '10px 20px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: 'var(--primary-blue)',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontWeight: '500',
-              }}
-            >
-              Создать заявку на перемещение
-            </button>
           </div>
         )}
 
@@ -1275,67 +1188,308 @@ export const LocationsPage = () => {
         {/* Раздел перемещений товаров между площадками */}
         {activeTab === 'transfers' && isAdmin && (
           <div className="card-plain">
-            <h3>Перемещения</h3>
-            {transfers.filter(t => t.fromWarehouseId === selectedWarehouse || t.toWarehouseId === selectedWarehouse).length > 0 ? (
-              <div style={{ marginTop: '16px' }}>
-                {transfers
-                  .filter(t => t.fromWarehouseId === selectedWarehouse || t.toWarehouseId === selectedWarehouse)
-                  .sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime())
-                  .map(transfer => {
-                    const fromWarehouse = warehouses.find(w => w.id === transfer.fromWarehouseId);
-                    const toWarehouse = warehouses.find(w => w.id === transfer.toWarehouseId);
-                    const isIncoming = transfer.toWarehouseId === selectedWarehouse;
+            <h3>Перемещения товаров между площадками</h3>
+            
+            {/* Фильтры для перемещений */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', marginTop: '12px', flexWrap: 'wrap' }}>
+              <select 
+                value={transferFilters.type}
+                onChange={(e) => setTransferFilters({ ...transferFilters, type: e.target.value })}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-primary)',
+                  backgroundColor: 'var(--surface-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  fontWeight: '500',
+                  minWidth: '180px',
+                }}
+              >
+                <option value="all">Все перемещения</option>
+                {selectedWarehouse && <option value="incoming">📥 Входящие</option>}
+                {selectedWarehouse && <option value="outgoing">📤 Исходящие</option>}
+              </select>
 
-                    return (
-                      <div key={transfer.id} style={{
-                        padding: '12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        marginBottom: '12px',
-                        backgroundColor: 'var(--surface-secondary)',
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                          <div>
-                            <div style={{ marginBottom: '8px' }}>
+              <input
+                type="text"
+                placeholder="Поиск по товарам..."
+                value={transferFilters.searchProduct}
+                onChange={(e) => setTransferFilters({ ...transferFilters, searchProduct: e.target.value })}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-primary)',
+                  backgroundColor: 'var(--surface-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                  transition: 'all 0.2s ease',
+                  flex: 1,
+                  minWidth: '150px',
+                }}
+              />
+
+              <button
+                onClick={() => {
+                  setTransferFilters({ type: 'all', searchProduct: '' });
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-primary)',
+                  backgroundColor: 'var(--surface-tertiary)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--surface-tertiary)';
+                }}
+              >
+                ↻ Очистить
+              </button>
+            </div>
+
+            {transfers.length > 0 ? (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse',
+                  backgroundColor: 'var(--surface-secondary)',
+                }}>
+                  <thead>
+                    <tr style={{ 
+                      backgroundColor: 'var(--surface-tertiary)',
+                      borderBottom: '2px solid var(--border-primary)',
+                    }}>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>№</th>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Тип</th>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>От → На</th>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Товары</th>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Создатель</th>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Одобрено</th>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Завершено</th>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Статус</th>
+                      <th style={{ textAlign: 'left', padding: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>Дата</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transfers
+                      .filter(t => {
+                        // Фильтр по типу если выбрана площадка
+                        if (selectedWarehouse && transferFilters.type !== 'all') {
+                          if (transferFilters.type === 'incoming' && t.toWarehouseId !== selectedWarehouse) return false;
+                          if (transferFilters.type === 'outgoing' && t.fromWarehouseId !== selectedWarehouse) return false;
+                        }
+                        // Фильтр по поисковому запросу товаров
+                        if (transferFilters.searchProduct) {
+                          const searchLower = transferFilters.searchProduct.toLowerCase();
+                          const hasProduct = (t.products || []).some((p: RequestProduct) => 
+                            p.productName?.toLowerCase().includes(searchLower)
+                          );
+                          if (!hasProduct) return false;
+                        }
+                        return true;
+                      })
+                      .sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime())
+                      .map(transfer => {
+                        const fromWarehouse = warehouses.find(w => w.id === transfer.fromWarehouseId);
+                        const toWarehouse = warehouses.find(w => w.id === transfer.toWarehouseId);
+                        const isIncoming = selectedWarehouse && transfer.toWarehouseId === selectedWarehouse;
+                        
+                        const statusColor = {
+                          'pending': '#f39c12',
+                          'approved': '#3498db',
+                          'in_transit': '#9b59b6',
+                          'completed': '#27ae60',
+                          'rejected': '#e74c3c',
+                        }[transfer.status as string] || '#95a5a6';
+
+                        return (
+                          <tr 
+                            key={transfer.id} 
+                            style={{ 
+                              borderLeft: `4px solid ${statusColor}`,
+                              borderBottom: '1px solid var(--border-primary)',
+                              backgroundColor: 'var(--surface-primary)',
+                              transition: 'background-color 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'var(--surface-secondary)';
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'var(--surface-primary)';
+                            }}
+                          >
+                            <td style={{ padding: '12px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                              REQ-{transfer.id}
+                            </td>
+                            <td style={{ padding: '12px' }}>
                               <span style={{
                                 padding: '4px 8px',
                                 borderRadius: '4px',
-                                backgroundColor: isIncoming ? '#c8e6c9' : '#ffccbc',
+                                backgroundColor: isIncoming 
+                                  ? 'rgba(76, 175, 80, 0.2)' 
+                                  : selectedWarehouse 
+                                  ? 'rgba(255, 152, 0, 0.2)' 
+                                  : 'rgba(158, 158, 158, 0.2)',
+                                color: isIncoming 
+                                  ? '#2e7d32' 
+                                  : selectedWarehouse 
+                                  ? '#e65100' 
+                                  : '#424242',
                                 fontSize: '12px',
-                                fontWeight: '500',
-                                marginRight: '8px'
+                                fontWeight: '600',
+                                border: `1px solid ${isIncoming 
+                                  ? '#4caf50' 
+                                  : selectedWarehouse 
+                                  ? '#ff9800' 
+                                  : '#9e9e9e'}`,
                               }}>
-                                {isIncoming ? '📥 Входящее' : '📤 Исходящее'}
+                                {isIncoming ? '📥 Входящее' : selectedWarehouse ? '📤 Исходящее' : '↔️ Общее'}
                               </span>
-                              <span style={{
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                backgroundColor: transfer.status === 'in_transit' ? '#fff9c4' : transfer.status === 'completed' ? '#c8e6c9' : '#f0f0f0',
-                                fontSize: '12px',
-                                fontWeight: '500',
-                              }}>
-                                {transfer.status === 'in_transit' ? '📦 В пути' : transfer.status === 'completed' ? '✓ Завершено' : 'Ожидание'}
+                            </td>
+                            <td style={{ padding: '12px', color: 'var(--text-primary)', fontSize: '13px' }}>
+                              <div>{fromWarehouse?.name || 'Неизвестная'}</div>
+                              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>↓</div>
+                              <div>{toWarehouse?.name || 'Неизвестная'}</div>
+                            </td>
+                            <td style={{ padding: '12px', fontSize: '12px' }}>
+                              {(transfer.products || []).length > 0 ? (
+                                <div>
+                                  <div style={{ fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>
+                                    {(transfer.products || []).length} шт.
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', maxHeight: '60px', overflow: 'auto' }}>
+                                    {(transfer.products || []).map((p: RequestProduct, idx: number) => (
+                                      <div key={idx}>
+                                        • {p.productName} ({p.quantity})
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span style={{ color: 'var(--text-secondary)' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                              {transfer.createdByUser?.firstName ? (
+                                <div style={{
+                                  padding: '8px',
+                                  backgroundColor: 'rgba(66, 133, 244, 0.15)',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(66, 133, 244, 0.3)',
+                                }}>
+                                  <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    ✎ {transfer.createdByUser.firstName} {transfer.createdByUser.lastName}
+                                  </div>
+                                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                    {new Date(transfer.startedAt || 0).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span style={{ color: 'var(--text-secondary)' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                              {transfer.approvedByUser?.firstName ? (
+                                <div style={{
+                                  padding: '8px',
+                                  backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(76, 175, 80, 0.3)',
+                                }}>
+                                  <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '14px' }}>✓</span>
+                                    <span>{transfer.approvedByUser.firstName} {transfer.approvedByUser.lastName}</span>
+                                  </div>
+                                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                    Одобрил перемещение
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{
+                                  padding: '8px',
+                                  backgroundColor: 'rgba(244, 208, 63, 0.15)',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(244, 208, 63, 0.3)',
+                                  color: '#f59e0b',
+                                  fontWeight: '600',
+                                  fontSize: '12px',
+                                }}>
+                                  ⏳ Ожидает одобрения
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                              {transfer.completedByUser?.firstName ? (
+                                <div style={{
+                                  padding: '8px',
+                                  backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(76, 175, 80, 0.3)',
+                                }}>
+                                  <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '14px' }}>✓</span>
+                                    <span>{transfer.completedByUser.firstName} {transfer.completedByUser.lastName}</span>
+                                  </div>
+                                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                    Принял перемещение {new Date(transfer.completedAt || 0).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{
+                                  padding: '8px',
+                                  backgroundColor: 'rgba(158, 158, 158, 0.15)',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(158, 158, 158, 0.3)',
+                                  color: 'var(--text-secondary)',
+                                  fontWeight: '600',
+                                  fontSize: '12px',
+                                }}>
+                                  — Не принято
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '6px 12px',
+                                  borderRadius: '4px',
+                                  backgroundColor: statusColor,
+                                  color: 'white',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                }}
+                              >
+                                {transfer.status === 'pending' ? 'Ожидание' : 
+                                 transfer.status === 'approved' ? 'Одобрено' : 
+                                 transfer.status === 'in_transit' ? 'В пути' : 
+                                 transfer.status === 'completed' ? 'Завершено' : 
+                                 transfer.status === 'rejected' ? 'Отклонено' : transfer.status}
                               </span>
-                            </div>
-                            <p style={{ marginBottom: '4px' }}>
-                              <strong>От:</strong> {fromWarehouse?.name || 'Неизвестная площадка'}
-                            </p>
-                            <p style={{ marginBottom: '4px' }}>
-                              <strong>На:</strong> {toWarehouse?.name || 'Неизвестная площадка'}
-                            </p>
-                            {transfer.startedAt && (
-                              <p style={{ marginBottom: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                <strong>Дата:</strong> {new Date(transfer.startedAt).toLocaleDateString('ru-RU', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                            </td>
+                            <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                              {new Date(transfer.startedAt || 0).toLocaleDateString('ru-RU')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
               </div>
             ) : (
-              <p style={{ color: 'var(--text-secondary)', marginTop: '16px' }}>Нет перемещений для этой площадки</p>
+              <p style={{ color: 'var(--text-secondary)', marginTop: '16px', textAlign: 'center', padding: '32px' }}>
+                Перемещения не найдены
+              </p>
             )}
           </div>
         )}
