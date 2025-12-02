@@ -149,9 +149,9 @@ public class Request
     public int? TransferWarehouseId { get; set; } // FK to Warehouse.Id
     public string Status { get; set; } = "pending"; // pending, approved, in_transit, rejected, completed
     public string? Notes { get; set; }
-    public string? ApprovedBy { get; set; }
+    public int? ApprovedBy { get; set; }
     public DateTime? ApprovedAt { get; set; }
-    public string? CompletedBy { get; set; }
+    public int? CompletedBy { get; set; }
     public DateTime? CompletedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

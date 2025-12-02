@@ -191,7 +191,7 @@ public class RequestsController : ControllerBase
 
         if (statusUpdate.NewStatus == "approved")
         {
-            request.ApprovedBy = user.Username;
+            request.ApprovedBy = user.Id;
             request.ApprovedAt = DateTime.UtcNow;
         }
         else if (statusUpdate.NewStatus == "in_transit")
@@ -231,7 +231,7 @@ public class RequestsController : ControllerBase
         }
         else if (statusUpdate.NewStatus == "completed")
         {
-            request.CompletedBy = user.Username;
+            request.CompletedBy = user.Id;
             request.CompletedAt = DateTime.UtcNow;
 
             // Обновляем товары: уменьшаем количество на площадке отправления, увеличиваем на площадке получения
