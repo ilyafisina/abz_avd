@@ -22,7 +22,10 @@ public class RequestsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Request>>> GetRequests([FromQuery] string? status = null, [FromQuery] int? warehouse = null)
     {
-        var query = _context.Requests.AsQueryable();
+        var query = _context.Requests
+            .Include(r => r.RequestProducts)
+            .ThenInclude(rp => rp.Product)
+            .AsQueryable();
         if (!string.IsNullOrEmpty(status))
             query = query.Where(r => r.Status == status);
         if (warehouse.HasValue)
@@ -33,7 +36,10 @@ public class RequestsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<Request>> GetRequest(int id)
     {
-        var request = await _context.Requests.FindAsync(id);
+        var request = await _context.Requests
+            .Include(r => r.RequestProducts)
+            .ThenInclude(rp => rp.Product)
+            .FirstOrDefaultAsync(r => r.Id == id);
         if (request == null)
             return NotFound();
         return request;
@@ -45,6 +51,12 @@ public class RequestsController : ControllerBase
         _context.Requests.Add(request);
         await _context.SaveChangesAsync();
 
+        // Загружаем свежие данные с RequestProducts
+        var createdRequest = await _context.Requests
+            .Include(r => r.RequestProducts)
+            .ThenInclude(rp => rp.Product)
+            .FirstOrDefaultAsync(r => r.Id == request.Id);
+
         await _auditService.LogActionAsync(
             "CREATE",
             "Request",
@@ -55,7 +67,7 @@ public class RequestsController : ControllerBase
             logLevel: "INFO"
         );
 
-        return CreatedAtAction(nameof(GetRequest), new { id = request.Id }, request);
+        return CreatedAtAction(nameof(GetRequest), new { id = request.Id }, createdRequest);
     }
 
     [HttpPut("{id}")]
@@ -93,7 +105,222 @@ public class RequestsController : ControllerBase
             logLevel: "INFO"
         );
 
-        return NoContent();
+        // Возвращаем обновленный Request с RequestProducts
+        var updatedRequest = await _context.Requests
+            .Include(r => r.RequestProducts)
+            .ThenInclude(rp => rp.Product)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        return Ok(updatedRequest);
+    }
+
+    [HttpPatch("{id}/status")]
+    public async Task<IActionResult> UpdateRequestStatus(
+        int id,
+        [FromBody] UpdateRequestStatusDto statusUpdate,
+        [FromQuery] int loggedInUserId)
+    {
+        var request = await _context.Requests.FindAsync(id);
+        if (request == null)
+            return NotFound();
+
+        var user = await _context.Users.FindAsync(loggedInUserId);
+        if (user == null)
+            return Unauthorized();
+
+        // Check permissions based on user role and request status
+        bool canChangeStatus = false;
+
+        if (user.Role == "admin")
+        {
+            // Admin can change any status
+            canChangeStatus = true;
+        }
+        else if (user.Role == "manager")
+        {
+            // Manager can only manage requests for their warehouse
+            if (request.WarehouseId == user.WarehouseId)
+            {
+                // Manager from source warehouse can:
+                // - approve/reject pending requests
+                // - return from approved to pending (for editing)
+                if (request.Status == "pending" && (statusUpdate.NewStatus == "approved" || statusUpdate.NewStatus == "rejected"))
+                {
+                    canChangeStatus = true;
+                }
+                else if (request.Status == "approved" && statusUpdate.NewStatus == "pending")
+                {
+                    canChangeStatus = true; // Allow returning to pending for editing
+                }
+                else if (request.Status == "approved" && statusUpdate.NewStatus == "in_transit")
+                {
+                    canChangeStatus = true; // Allow moving to in_transit
+                }
+            }
+            if (request.TransferWarehouseId == user.WarehouseId)
+            {
+                // Manager from target warehouse can complete in_transit requests
+                if (request.Status == "in_transit" && statusUpdate.NewStatus == "completed")
+                {
+                    canChangeStatus = true;
+                }
+            }
+        }
+
+        if (!canChangeStatus)
+            return BadRequest("You don't have permission to change this request status");
+
+        // Validate status transition (skip for admin)
+        if (user.Role != "admin")
+        {
+            var validTransitions = new Dictionary<string, string[]>
+            {
+                { "pending", new string[] { "approved", "rejected" } },
+                { "approved", new string[] { "in_transit", "rejected", "pending" } },
+                { "in_transit", new string[] { "completed", "rejected" } },
+                { "rejected", new string[] { "pending" } },
+                { "completed", new string[] { } }
+            };
+
+            if (!validTransitions.ContainsKey(request.Status) || !validTransitions[request.Status].Contains(statusUpdate.NewStatus))
+                return BadRequest($"Invalid status transition from {request.Status} to {statusUpdate.NewStatus}");
+        }
+
+        var oldStatus = request.Status;
+        request.Status = statusUpdate.NewStatus;
+
+        if (statusUpdate.NewStatus == "approved")
+        {
+            request.ApprovedBy = user.Username;
+            request.ApprovedAt = DateTime.UtcNow;
+        }
+        else if (statusUpdate.NewStatus == "in_transit")
+        {
+            // При переходе на "in_transit" создаём ТТН (Transfer)
+            if (request.TransferWarehouseId.HasValue)
+            {
+                var transfer = new Transfer
+                {
+                    CreatedByUserId = loggedInUserId,
+                    FromWarehouseId = request.WarehouseId,
+                    ToWarehouseId = request.TransferWarehouseId.Value,
+                    Status = "in_transit",
+                    StartedAt = DateTime.UtcNow
+                };
+
+                _context.Transfers.Add(transfer);
+                await _context.SaveChangesAsync(); // Сохраняем Transfer чтобы получить ID
+
+                // Добавляем товары в ТТН
+                var requestProducts = await _context.RequestProducts
+                    .Where(rp => rp.RequestId == request.Id)
+                    .Include(rp => rp.Product)
+                    .ToListAsync();
+
+                foreach (var rp in requestProducts)
+                {
+                    var transferProduct = new TransferProduct
+                    {
+                        TransferId = transfer.Id,
+                        ProductId = rp.ProductId,
+                        Quantity = rp.Quantity
+                    };
+                    _context.TransferProducts.Add(transferProduct);
+                }
+            }
+        }
+        else if (statusUpdate.NewStatus == "completed")
+        {
+            request.CompletedBy = user.Username;
+            request.CompletedAt = DateTime.UtcNow;
+
+            // Обновляем товары: уменьшаем количество на площадке отправления, увеличиваем на площадке получения
+            if (request.TransferWarehouseId.HasValue)
+            {
+                var requestProducts = await _context.RequestProducts
+                    .Where(rp => rp.RequestId == request.Id)
+                    .Include(rp => rp.Product)
+                    .ToListAsync();
+
+                foreach (var rp in requestProducts)
+                {
+                    // Уменьшаем на площадке отправления
+                    var fromProduct = await _context.Products
+                        .FirstOrDefaultAsync(p => p.Id == rp.ProductId && p.WarehouseId == request.WarehouseId);
+                    if (fromProduct != null)
+                    {
+                        fromProduct.Quantity -= rp.Quantity;
+                        _context.Products.Update(fromProduct);
+                    }
+
+                    // Увеличиваем на площадке получения (с проверкой по штрихкоду)
+                    if (rp.Product != null && rp.Product.Barcode != null)
+                    {
+                        // Ищем товар по штрихкоду на целевой площадке
+                        var toProduct = await _context.Products
+                            .FirstOrDefaultAsync(p => p.Barcode == rp.Product.Barcode && p.WarehouseId == request.TransferWarehouseId.Value);
+                        
+                        if (toProduct != null)
+                        {
+                            // Товар существует - плюсуем количество
+                            toProduct.Quantity += rp.Quantity;
+                            _context.Products.Update(toProduct);
+                        }
+                        else
+                        {
+                            // Товара нет - создаём новый на целевой площадке
+                            var newProduct = new Product
+                            {
+                                Name = rp.Product.Name,
+                                Sku = rp.Product.Sku,
+                                Barcode = rp.Product.Barcode,
+                                QrCode = rp.Product.QrCode,
+                                CategoryId = rp.Product.CategoryId,
+                                Price = rp.Product.Price,
+                                Quantity = rp.Quantity,
+                                MinQuantity = rp.Product.MinQuantity,
+                                Location = rp.Product.Location,
+                                WarehouseId = request.TransferWarehouseId.Value
+                            };
+                            _context.Products.Add(newProduct);
+                        }
+                    }
+                    else
+                    {
+                        // Нет штрихкода - пытаемся найти по ID
+                        var toProduct = await _context.Products
+                            .FirstOrDefaultAsync(p => p.Id == rp.ProductId && p.WarehouseId == request.TransferWarehouseId.Value);
+                        
+                        if (toProduct != null)
+                        {
+                            toProduct.Quantity += rp.Quantity;
+                            _context.Products.Update(toProduct);
+                        }
+                    }
+                }
+            }
+        }
+
+        request.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        // Перезагружаем request с RequestProducts для ответа
+        var updatedRequest = await _context.Requests
+            .Include(r => r.RequestProducts)
+            .ThenInclude(rp => rp.Product)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        await _auditService.LogActionAsync(
+            "UPDATE",
+            "Request",
+            id,
+            null,
+            request.WarehouseId,
+            description: $"Request {id} status changed from {oldStatus} to {statusUpdate.NewStatus} by {user.Username}",
+            logLevel: "INFO"
+        );
+
+        return Ok(updatedRequest);
     }
 
     [HttpDelete("{id}")]
@@ -117,6 +344,71 @@ public class RequestsController : ControllerBase
         );
 
         return NoContent();
+    }
+
+    [HttpPost("{id}/products")]
+    public async Task<IActionResult> AddProductToRequest(int id, [FromBody] AddProductToRequestDto productData)
+    {
+        var request = await _context.Requests.FindAsync(id);
+        if (request == null)
+            return NotFound("Request not found");
+
+        var product = await _context.Products.FindAsync(productData.ProductId);
+        if (product == null)
+            return NotFound("Product not found");
+
+        // Проверяем, не существует ли уже такой товар в этой заявке
+        var existingProduct = await _context.RequestProducts
+            .FirstOrDefaultAsync(rp => rp.RequestId == id && rp.ProductId == productData.ProductId);
+
+        if (existingProduct != null)
+        {
+            // Если существует, увеличиваем количество
+            existingProduct.Quantity += productData.Quantity;
+            _context.RequestProducts.Update(existingProduct);
+        }
+        else
+        {
+            // Если нет, создаём новый RequestProduct
+            var requestProduct = new RequestProduct
+            {
+                RequestId = id,
+                ProductId = productData.ProductId,
+                Quantity = productData.Quantity,
+            };
+            _context.RequestProducts.Add(requestProduct);
+        }
+
+        await _context.SaveChangesAsync();
+
+        // Возвращаем обновленный Request с товарами
+        var updatedRequest = await _context.Requests
+            .Include(r => r.RequestProducts)
+            .ThenInclude(rp => rp.Product)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        return Ok(updatedRequest);
+    }
+
+    [HttpDelete("{id}/products/{productId}")]
+    public async Task<IActionResult> RemoveProductFromRequest(int id, int productId)
+    {
+        var requestProduct = await _context.RequestProducts
+            .FirstOrDefaultAsync(rp => rp.RequestId == id && rp.ProductId == productId);
+
+        if (requestProduct == null)
+            return NotFound("Product not found in request");
+
+        _context.RequestProducts.Remove(requestProduct);
+        await _context.SaveChangesAsync();
+
+        // Возвращаем обновленный Request с товарами
+        var updatedRequest = await _context.Requests
+            .Include(r => r.RequestProducts)
+            .ThenInclude(rp => rp.Product)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        return Ok(updatedRequest);
     }
 
     private bool RequestExists(int id)

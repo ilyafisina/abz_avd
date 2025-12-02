@@ -14,6 +14,7 @@ public class WarehouseContext : DbContext
     public DbSet<Category> Categories { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<Request> Requests { get; set; }
+    public DbSet<RequestProduct> RequestProducts { get; set; }
     public DbSet<Transfer> Transfers { get; set; }
     public DbSet<TransferProduct> TransferProducts { get; set; }
     public DbSet<TransferComment> TransferComments { get; set; }
@@ -194,6 +195,26 @@ public class WarehouseContext : DbContext
                 .HasForeignKey(e => e.TransferWarehouseId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .IsRequired(false);
+
+            entity.HasMany(e => e.RequestProducts)
+                .WithOne(rp => rp.Request)
+                .HasForeignKey(rp => rp.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // RequestProduct configuration
+        modelBuilder.Entity<RequestProduct>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Request)
+                .WithMany(r => r.RequestProducts)
+                .HasForeignKey(e => e.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Product)
+                .WithMany()
+                .HasForeignKey(e => e.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // AuditLog configuration

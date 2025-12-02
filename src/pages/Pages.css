@@ -193,6 +193,142 @@
   gap: 6px;
 }
 
+.products-list {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0 24px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.products-list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.products-list thead {
+  background-color: var(--surface-secondary);
+}
+
+.products-list th {
+  padding: 14px;
+  text-align: left;
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-primary);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+
+.products-list td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--text-primary);
+}
+
+.products-list tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.products-list tbody tr:hover {
+  background-color: var(--surface-secondary);
+}
+
+.products-list tr.low-stock {
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
+.products-list tr.low-stock:hover {
+  background-color: rgba(255, 152, 0, 0.15);
+}
+
+.products-list .product-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.products-list .sku {
+  color: var(--text-secondary);
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.products-list .quantity {
+  font-weight: 600;
+  text-align: center;
+  color: #059669;
+}
+
+.products-list .price {
+  color: var(--primary-blue);
+  font-weight: 600;
+  text-align: right;
+}
+
+.products-list .warehouse {
+  background-color: var(--primary-blue-light);
+  color: var(--primary-blue);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.products-list .status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.products-list .status-badge.ok {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.products-list .status-badge.alert {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.btn-action {
+  padding: 6px 10px;
+  font-size: 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-edit {
+  background-color: var(--primary-blue);
+  color: white;
+}
+
+.btn-edit:hover {
+  background-color: #0d47a1;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-delete {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.btn-delete:hover {
+  background-color: #c0392b;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 .empty-cell {
   text-align: center;
   color: var(--text-secondary);
@@ -1060,6 +1196,24 @@
 
   .locations-grid {
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  }
+
+  .products-list {
+    margin: 0 16px 24px;
+  }
+
+  .products-list table {
+    font-size: 12px;
+  }
+
+  .products-list th,
+  .products-list td {
+    padding: 10px;
+  }
+
+  .btn-action {
+    padding: 4px 8px;
+    font-size: 11px;
   }
 }
 

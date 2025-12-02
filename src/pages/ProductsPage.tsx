@@ -473,7 +473,7 @@ export const ProductsPage = () => {
 
       <div className="products-list">
         {sortedProducts.length > 0 ? (
-          <table>
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Название</th>
@@ -503,36 +503,20 @@ export const ProductsPage = () => {
                       </span>
                     </td>
                     {isAdmin && <td className="warehouse">{warehouseName}</td>}
-                    <td style={{ display: 'flex', gap: '8px' }}>
+                    <td style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <button
                         onClick={() => handleEdit(product)}
-                        className="btn-small"
-                        style={{
-                          padding: '4px 8px',
-                          fontSize: '12px',
-                          backgroundColor: 'var(--primary-blue)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                        }}
+                        className="btn-action btn-edit"
+                        title="Редактировать товар"
                       >
-                        ✏ Редакт.
+                        ✏️ Редакт.
                       </button>
                       <button
                         onClick={() => handleDelete(product.id)}
-                        className="btn-small"
-                        style={{
-                          padding: '4px 8px',
-                          fontSize: '12px',
-                          backgroundColor: '#e74c3c',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                        }}
+                        className="btn-action btn-delete"
+                        title="Удалить товар"
                       >
-                        🗑 Удал.
+                        🗑️ Удал.
                       </button>
                     </td>
                   </tr>

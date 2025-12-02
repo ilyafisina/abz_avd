@@ -18,7 +18,7 @@ export const LocationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchLocation, setSearchLocation] = useState('');
   const [selectedWarehouse, setSelectedWarehouse] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'products' | 'users'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'users' | 'transfers'>('products');
   
   // Форма для добавления новой площадки (для админа)
   const [showAddWarehouseForm, setShowAddWarehouseForm] = useState(false);
@@ -64,6 +64,14 @@ export const LocationsPage = () => {
     minQuantity: 10,
     location: '',
   });
+
+  // Форма создания заявки на перемещение (новая форма для админа в Местоположениях)
+  const [showCreateRequestForm, setShowCreateRequestForm] = useState(false);
+  const [createRequestForm, setCreateRequestForm] = useState({
+    products: [] as Array<{ productId: string; quantity: number }>,
+    targetWarehouseId: '',
+    notes: '',
+  });
   
   const [categories, setCategories] = useState<Category[]>([]);
   const [productFilters, setProductFilters] = useState({
@@ -73,6 +81,7 @@ export const LocationsPage = () => {
     quantity: 'all',
     searchProduct: '',
   });
+  const [transfers, setTransfers] = useState<any[]>([]);
 
   const pdfRef = useRef<HTMLDivElement>(null);
   const isAdmin = user?.role === 'admin';
@@ -82,16 +91,18 @@ export const LocationsPage = () => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [productsData, warehousesData, categoriesData, usersData] = await Promise.all([
+        const [productsData, warehousesData, categoriesData, usersData, transfersData] = await Promise.all([
           apiService.getProducts(),
           apiService.getWarehouses(),
           apiService.getCategories(),
           apiService.getUsers(),
+          apiService.getTransfers(),
         ]);
         setProducts(productsData);
         setWarehouses(warehousesData);
         setCategories(categoriesData);
         setUsers(usersData);
+        setTransfers(transfersData || []);
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);
       } finally {
@@ -330,6 +341,75 @@ export const LocationsPage = () => {
     }
   };
 
+  const handleCreateRequest = async () => {
+    if (createRequestForm.products.length === 0 || !createRequestForm.targetWarehouseId) {
+      showError('Выберите товары и целевую площадку');
+      return;
+    }
+
+    // Проверяем что все товары имеют корректное количество
+    if (createRequestForm.products.some(p => p.quantity <= 0)) {
+      showError('Все товары должны иметь количество больше нуля');
+      return;
+    }
+
+    try {
+      const productsList = createRequestForm.products.map(p => {
+        const product = getWarehouseProducts(selectedWarehouse!).find(prod => prod.id === p.productId);
+        return {
+          productId: p.productId,
+          productName: product?.name || '',
+          quantity: p.quantity,
+        };
+      });
+
+      await apiService.createRequest({
+        requestType: 'transfer',
+        status: 'pending',
+        warehouseId: selectedWarehouse || 1,
+        transferWarehouseId: parseInt(createRequestForm.targetWarehouseId),
+        products: productsList,
+        createdBy: user?.id || '3',
+        priority: 'normal',
+        notes: createRequestForm.notes || '',
+      });
+      
+      setShowCreateRequestForm(false);
+      setCreateRequestForm({ products: [], targetWarehouseId: '', notes: '' });
+      showSuccess('Заявка на перемещение создана успешно');
+    } catch (error) {
+      console.error('Ошибка при создании заявки:', error);
+      showError('Не удалось создать заявку');
+    }
+  };
+
+  const addProductToRequest = (productId: string) => {
+    if (createRequestForm.products.find(p => p.productId === productId)) {
+      showError('Товар уже добавлен');
+      return;
+    }
+    setCreateRequestForm({
+      ...createRequestForm,
+      products: [...createRequestForm.products, { productId, quantity: 1 }],
+    });
+  };
+
+  const removeProductFromRequest = (productId: string) => {
+    setCreateRequestForm({
+      ...createRequestForm,
+      products: createRequestForm.products.filter(p => p.productId !== productId),
+    });
+  };
+
+  const updateRequestProductQuantity = (productId: string, quantity: number) => {
+    setCreateRequestForm({
+      ...createRequestForm,
+      products: createRequestForm.products.map(p =>
+        p.productId === productId ? { ...p, quantity } : p
+      ),
+    });
+  };
+
   const exportToPDF = async (warehouse: Warehouse) => {
     if (!pdfRef.current) return;
 
@@ -464,6 +544,12 @@ export const LocationsPage = () => {
             >
               Сотрудники ({users.filter(u => u.warehouseId === selectedWarehouse).length})
             </button>
+            <button
+              className={`tab-btn ${activeTab === 'transfers' ? 'active' : ''}`}
+              onClick={() => setActiveTab('transfers')}
+            >
+              Перемещения
+            </button>
           </div>
         )}
 
@@ -534,12 +620,24 @@ export const LocationsPage = () => {
                 />
               </div>
               
-              <div className="filter-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <div className="filter-group" style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
                 <button
                   onClick={() => setProductFilters({ status: 'all', priceMin: '', priceMax: '', quantity: 'all', searchProduct: '' })}
-                  style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-primary)', backgroundColor: 'var(--surface-primary)', color: 'var(--text-primary)', fontSize: '13px', cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-primary)', backgroundColor: 'var(--surface-primary)', color: 'var(--text-primary)', fontSize: '13px', cursor: 'pointer' }}
                 >
                   Очистить
+                </button>
+                <button
+                  onClick={() => setShowAddProductForm(!showAddProductForm)}
+                  style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: 'none', backgroundColor: '#4caf50', color: '#ffffff', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}
+                >
+                  {showAddProductForm ? '✕' : '+ Товар'}
+                </button>
+                <button
+                  onClick={() => setShowCreateRequestForm(!showCreateRequestForm)}
+                  style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: 'none', backgroundColor: 'var(--primary-blue)', color: '#ffffff', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}
+                >
+                  {showCreateRequestForm ? '✕' : '+ Заявка'}
                 </button>
               </div>
             </div>
@@ -761,16 +859,194 @@ export const LocationsPage = () => {
           </div>
         )}
 
-        {/* Для администратора - форма добавления нового товара */}
-        {isAdmin && (
-          <div className="card-plain" style={{ marginTop: '20px' }}>
-            <h3 className="no-margin">Добавить новый товар на площадку</h3>
-            
+        {/* Для администратора - форма добавления нового товара (встроена в фильтры) */}
+        {isAdmin && activeTab === 'products' && showAddProductForm && (
+          <div style={{
+            marginTop: '16px',
+            padding: '16px',
+            backgroundColor: 'var(--surface-secondary)',
+            borderRadius: '8px',
+            border: '1px solid var(--border-primary)',
+          }}>
+            <h4 style={{ marginBottom: '16px' }}>Добавить новый товар на площадку</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Название товара *</label>
+                <input
+                  type="text"
+                  value={addProductForm.name}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, name: e.target.value })}
+                  placeholder="Введите название товара"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Категория *</label>
+                <select
+                  value={addProductForm.category}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, category: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="">Выберите категорию</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>SKU *</label>
+                <input
+                  type="text"
+                  value={addProductForm.sku}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, sku: e.target.value })}
+                  placeholder="Артикул"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Штрихкод *</label>
+                <input
+                  type="text"
+                  value={addProductForm.barcode}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, barcode: e.target.value })}
+                  placeholder="Штрихкод товара"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>QR Код</label>
+                <input
+                  type="text"
+                  value={addProductForm.qrCode}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, qrCode: e.target.value })}
+                  placeholder="QR код (опционально)"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Цена (₽) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={addProductForm.price}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, price: parseFloat(e.target.value) || 0 })}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Количество *</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={addProductForm.quantity}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, quantity: parseInt(e.target.value) || 0 })}
+                  placeholder="Количество единиц"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Минимальный запас</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={addProductForm.minQuantity}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, minQuantity: parseInt(e.target.value) || 10 })}
+                  placeholder="Минимум для уведомления"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Местоположение</label>
+                <input
+                  type="text"
+                  value={addProductForm.location}
+                  onChange={(e) => setAddProductForm({ ...addProductForm, location: e.target.value })}
+                  placeholder="Полка/зона (опционально)"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+            </div>
+
             <button
-              onClick={() => setShowAddProductForm(!showAddProductForm)}
+              onClick={handleAddProduct}
               style={{
                 marginTop: '16px',
-                padding: '10px 16px',
+                padding: '10px 20px',
                 borderRadius: '6px',
                 border: 'none',
                 backgroundColor: '#4caf50',
@@ -779,207 +1055,167 @@ export const LocationsPage = () => {
                 fontWeight: '500',
               }}
             >
-              {showAddProductForm ? '✕ Отменить' : '+ Добавить товар'}
+              Добавить товар на площадку
             </button>
+          </div>
+        )}
 
-            {showAddProductForm && (
-              <div style={{
-                marginTop: '16px',
-                padding: '16px',
-                backgroundColor: 'var(--surface-secondary)',
-                borderRadius: '8px',
-                border: '1px solid var(--border-primary)',
-              }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Название товара *</label>
-                    <input
-                      type="text"
-                      value={addProductForm.name}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, name: e.target.value })}
-                      placeholder="Введите название товара"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Категория *</label>
-                    <select
-                      value={addProductForm.category}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, category: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      <option value="">Выберите категорию</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>SKU *</label>
-                    <input
-                      type="text"
-                      value={addProductForm.sku}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, sku: e.target.value })}
-                      placeholder="Артикул"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Штрихкод *</label>
-                    <input
-                      type="text"
-                      value={addProductForm.barcode}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, barcode: e.target.value })}
-                      placeholder="Штрихкод товара"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>QR Код</label>
-                    <input
-                      type="text"
-                      value={addProductForm.qrCode}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, qrCode: e.target.value })}
-                      placeholder="QR код (опционально)"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Цена (₽) *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={addProductForm.price}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, price: parseFloat(e.target.value) || 0 })}
-                      placeholder="0.00"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Количество *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={addProductForm.quantity}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, quantity: parseInt(e.target.value) || 0 })}
-                      placeholder="Количество единиц"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Минимальный запас</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={addProductForm.minQuantity}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, minQuantity: parseInt(e.target.value) || 10 })}
-                      placeholder="Минимум для уведомления"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Местоположение</label>
-                    <input
-                      type="text"
-                      value={addProductForm.location}
-                      onChange={(e) => setAddProductForm({ ...addProductForm, location: e.target.value })}
-                      placeholder="Полка/зона (опционально)"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-primary)',
-                        backgroundColor: 'var(--surface-primary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleAddProduct}
+        {/* Форма создания заявки на перемещение (встроена в фильтры) */}
+        {isAdmin && activeTab === 'products' && showCreateRequestForm && (
+          <div style={{
+            marginTop: '16px',
+            padding: '16px',
+            backgroundColor: 'var(--surface-secondary)',
+            borderRadius: '8px',
+            border: '1px solid var(--border-primary)',
+          }}>
+            <h4 style={{ marginBottom: '16px' }}>Создать заявку на перемещение</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Целевая площадка *</label>
+                <select
+                  value={createRequestForm.targetWarehouseId}
+                  onChange={(e) => setCreateRequestForm({ ...createRequestForm, targetWarehouseId: e.target.value })}
                   style={{
-                    marginTop: '16px',
-                    padding: '10px 20px',
+                    width: '100%',
+                    padding: '10px 12px',
                     borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#4caf50',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    fontWeight: '500',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
                   }}
                 >
-                  Добавить товар на площадку
-                </button>
+                  <option value="">Выберите целевую площадку</option>
+                  {warehouses.filter(w => w.id !== selectedWarehouse).map(w => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} - {w.location}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Добавить товар</label>
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      addProductToRequest(e.target.value);
+                      e.target.value = '';
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-primary)',
+                    backgroundColor: 'var(--surface-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="">Выберите товар</option>
+                  {warehouseProducts
+                    .filter(p => !createRequestForm.products.find(rp => rp.productId === p.id))
+                    .map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (осталось: {p.quantity})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Список выбранных товаров */}
+            {createRequestForm.products.length > 0 && (
+              <div style={{ marginTop: '16px', border: '1px solid var(--border-primary)', borderRadius: '6px', overflow: 'hidden' }}>
+                <table style={{ width: '100%' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: 'var(--surface-tertiary)' }}>
+                      <th style={{ padding: '12px', textAlign: 'left' }}>Товар</th>
+                      <th style={{ padding: '12px', textAlign: 'center' }}>Количество</th>
+                      <th style={{ padding: '12px', textAlign: 'center' }}>Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {createRequestForm.products.map(p => {
+                      const product = warehouseProducts.find(prod => prod.id === p.productId);
+                      return (
+                        <tr key={p.productId} style={{ borderTop: '1px solid var(--border-primary)' }}>
+                          <td style={{ padding: '12px' }}>{product?.name}</td>
+                          <td style={{ padding: '12px' }}>
+                            <input
+                              type="number"
+                              min="1"
+                              max={product?.quantity}
+                              value={p.quantity}
+                              onChange={(e) => updateRequestProductQuantity(p.productId, parseInt(e.target.value) || 1)}
+                              style={{
+                                width: '80px',
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border-primary)',
+                                backgroundColor: 'var(--surface-primary)',
+                                color: 'var(--text-primary)',
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <button
+                              onClick={() => removeProductFromRequest(p.productId)}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                backgroundColor: '#e74c3c',
+                                color: '#ffffff',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              Удалить
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
+
+            <div style={{ marginTop: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Примечание (опционально)</label>
+              <textarea
+                value={createRequestForm.notes}
+                onChange={(e) => setCreateRequestForm({ ...createRequestForm, notes: e.target.value })}
+                placeholder="Добавить примечание к заявке"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-primary)',
+                  backgroundColor: 'var(--surface-primary)',
+                  color: 'var(--text-primary)',
+                  minHeight: '80px',
+                  fontFamily: 'inherit',
+                }}
+              />
+            </div>
+
+            <button
+              onClick={handleCreateRequest}
+              style={{
+                marginTop: '16px',
+                padding: '10px 20px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: 'var(--primary-blue)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                fontWeight: '500',
+              }}
+            >
+              Создать заявку на перемещение
+            </button>
           </div>
         )}
 
@@ -1033,9 +1269,74 @@ export const LocationsPage = () => {
             ) : (
               <p style={{ color: 'var(--text-secondary)', marginTop: '16px' }}>На этой площадке нет сотрудников</p>
             )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '16px' }}>
-              Для добавления или изменения сотрудников перейдите в раздел <strong>"Пользователи"</strong> в администрации
-            </p>
+          </div>
+        )}
+
+        {/* Раздел перемещений товаров между площадками */}
+        {activeTab === 'transfers' && isAdmin && (
+          <div className="card-plain">
+            <h3>Перемещения</h3>
+            {transfers.filter(t => t.fromWarehouseId === selectedWarehouse || t.toWarehouseId === selectedWarehouse).length > 0 ? (
+              <div style={{ marginTop: '16px' }}>
+                {transfers
+                  .filter(t => t.fromWarehouseId === selectedWarehouse || t.toWarehouseId === selectedWarehouse)
+                  .sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime())
+                  .map(transfer => {
+                    const fromWarehouse = warehouses.find(w => w.id === transfer.fromWarehouseId);
+                    const toWarehouse = warehouses.find(w => w.id === transfer.toWarehouseId);
+                    const isIncoming = transfer.toWarehouseId === selectedWarehouse;
+
+                    return (
+                      <div key={transfer.id} style={{
+                        padding: '12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-primary)',
+                        marginBottom: '12px',
+                        backgroundColor: 'var(--surface-secondary)',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                          <div>
+                            <div style={{ marginBottom: '8px' }}>
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: isIncoming ? '#c8e6c9' : '#ffccbc',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                marginRight: '8px'
+                              }}>
+                                {isIncoming ? '📥 Входящее' : '📤 Исходящее'}
+                              </span>
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: transfer.status === 'in_transit' ? '#fff9c4' : transfer.status === 'completed' ? '#c8e6c9' : '#f0f0f0',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                              }}>
+                                {transfer.status === 'in_transit' ? '📦 В пути' : transfer.status === 'completed' ? '✓ Завершено' : 'Ожидание'}
+                              </span>
+                            </div>
+                            <p style={{ marginBottom: '4px' }}>
+                              <strong>От:</strong> {fromWarehouse?.name || 'Неизвестная площадка'}
+                            </p>
+                            <p style={{ marginBottom: '4px' }}>
+                              <strong>На:</strong> {toWarehouse?.name || 'Неизвестная площадка'}
+                            </p>
+                            {transfer.startedAt && (
+                              <p style={{ marginBottom: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                <strong>Дата:</strong> {new Date(transfer.startedAt).toLocaleDateString('ru-RU', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--text-secondary)', marginTop: '16px' }}>Нет перемещений для этой площадки</p>
+            )}
           </div>
         )}
 

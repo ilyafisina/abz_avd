@@ -113,7 +113,7 @@ public class ProductsController : ControllerBase
             logLevel: "INFO"
         );
 
-        return NoContent();
+        return Ok(product);
     }
 
     [HttpDelete("{id}")]

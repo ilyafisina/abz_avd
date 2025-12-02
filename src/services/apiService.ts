@@ -361,25 +361,49 @@ class ApiService {
 
   async getRequests(): Promise<Request[]> {
     const data = await this.fetchApi<any[]>('/requests');
-    return data.map((r: any) => ({
-      id: String(r.id),
-      requestNumber: `REQ-${r.id}`,
-      requestType: 'transfer',
-      status: r.status,
-      warehouseId: r.warehouseId,
-      transferWarehouseId: r.transferWarehouseId,
-      products: [],
-      createdBy: String(r.userId),
-      createdAt: new Date(r.createdAt),
-      priority: 'normal',
-      notes: r.notes,
-    }));
+    return data.map((r: any) => {
+      // Преобразуем RequestProducts в RequestProduct[] (фронтенд формат)
+      const products = (r.requestProducts || []).map((rp: any) => ({
+        productId: String(rp.productId),
+        productName: rp.product?.name || `Product ${rp.productId}`,
+        quantity: rp.quantity,
+        location: rp.product?.location || undefined,
+      }));
+
+      return {
+        id: String(r.id),
+        requestNumber: `REQ-${r.id}`,
+        requestType: 'transfer',
+        status: r.status,
+        warehouseId: r.warehouseId,
+        transferWarehouseId: r.transferWarehouseId,
+        products: products,
+        createdBy: String(r.userId),
+        createdAt: new Date(r.createdAt),
+        priority: 'normal',
+        notes: r.notes,
+      };
+    });
   }
 
   async getRequestById(id: string): Promise<Request | undefined> {
     try {
       const data = await this.fetchApi<any>(`/requests/${id}`);
       if (!data) return undefined;
+
+      console.log('Backend response for request:', data);
+      console.log('RequestProducts:', data.requestProducts);
+
+      // Преобразуем RequestProducts в RequestProduct[] (фронтенд формат)
+      const products = (data.requestProducts || []).map((rp: any) => ({
+        productId: String(rp.productId),
+        productName: rp.product?.name || `Product ${rp.productId}`,
+        quantity: rp.quantity,
+        location: rp.product?.location || undefined,
+      }));
+
+      console.log('Transformed products:', products);
+
       return {
         id: String(data.id),
         requestNumber: `REQ-${data.id}`,
@@ -387,7 +411,7 @@ class ApiService {
         status: data.status,
         warehouseId: data.warehouseId,
         transferWarehouseId: data.transferWarehouseId,
-        products: [],
+        products: products,
         createdBy: String(data.userId),
         createdAt: new Date(data.createdAt),
         priority: 'normal',
@@ -404,18 +428,38 @@ class ApiService {
   }
 
   async createRequest(request: Omit<Request, 'id' | 'createdAt' | 'requestNumber'>): Promise<Request> {
+    // Сначала создаём Request БЕЗ товаров (Request больше не имеет productId и quantity)
     const data = await this.fetchApi<any>('/requests', {
       method: 'POST',
       body: JSON.stringify({
         userId: parseInt(request.createdBy),
-        productId: request.products[0]?.productId || 1,
         warehouseId: request.warehouseId,
         transferWarehouseId: request.transferWarehouseId,
-        quantity: request.products[0]?.quantity || 0,
         status: request.status,
         notes: request.notes,
       }),
     });
+
+    const requestId = data.id;
+
+    // Теперь добавляем ВСЕ товары через endpoint /requests/{id}/products
+    if (request.products.length > 0) {
+      for (const product of request.products) {
+        await this.fetchApi(`/requests/${requestId}/products`, {
+          method: 'POST',
+          body: JSON.stringify({
+            productId: parseInt(String(product.productId)),
+            quantity: product.quantity,
+          }),
+        });
+      }
+    }
+
+    // Загружаем обновленную заявку с товарами
+    const updated = await this.getRequestById(String(requestId));
+    if (updated) {
+      return updated;
+    }
 
     return {
       id: String(data.id),
@@ -432,27 +476,36 @@ class ApiService {
     };
   }
 
-  async updateRequestStatus(id: string, status: Request['status']): Promise<Request | undefined> {
-    const data = await this.fetchApi<any>(`/requests/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ status }),
-    });
+  async updateRequestStatus(id: string, status: Request['status'], loggedInUserId: number): Promise<Request | undefined> {
+    try {
+      const data = await this.fetchApi<any>(`/requests/${id}/status?loggedInUserId=${loggedInUserId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ newStatus: status }),
+      });
 
-    if (!data) return undefined;
+      if (!data) return undefined;
 
-    return {
-      id: String(data.id),
-      requestNumber: `REQ-${data.id}`,
-      requestType: 'transfer',
-      status: data.status,
-      warehouseId: data.warehouseId,
-      transferWarehouseId: data.transferWarehouseId,
-      products: [],
-      createdBy: String(data.userId),
-      createdAt: new Date(data.createdAt),
-      priority: 'normal',
-      notes: data.notes,
-    };
+      return {
+        id: String(data.id),
+        requestNumber: `REQ-${data.id}`,
+        requestType: 'transfer',
+        status: data.status,
+        warehouseId: data.warehouseId,
+        transferWarehouseId: data.transferWarehouseId,
+        products: [],
+        createdBy: String(data.userId),
+        createdAt: new Date(data.createdAt),
+        approvedBy: data.approvedBy,
+        approvedAt: data.approvedAt ? new Date(data.approvedAt) : undefined,
+        completedBy: data.completedBy,
+        completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
+        priority: 'normal',
+        notes: data.notes,
+      };
+    } catch (error) {
+      console.error('Ошибка при обновлении статуса заявки:', error);
+      throw error;
+    }
   }
 
   // ==================== TRANSFERS ====================

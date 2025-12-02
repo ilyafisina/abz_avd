@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
-import type { Request, Warehouse, RequestProduct, RequestType, RequestStatus } from '../types';
+import type { Request, Warehouse, RequestProduct, RequestType, RequestStatus, Product } from '../types';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/useAuth';
 import { useNotification } from '../contexts/useNotification';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import './Pages.css';
+import './RequestsActions.css';
 
 export const RequestsPage = () => {
   const { user } = useAuth();
   const { showSuccess, showError } = useNotification();
   const [requests, setRequests] = useState<Request[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [filterStatus, setFilterStatus] = useState<RequestStatus | 'all'>('all');
   const [filterType, setFilterType] = useState<RequestType | 'all'>('all');
   const [sortBy, setSortBy] = useState('newest');
@@ -32,12 +35,14 @@ export const RequestsPage = () => {
     const loadRequests = async () => {
       setLoading(true);
       try {
-        const [warehousesData, requestsData] = await Promise.all([
+        const [warehousesData, requestsData, productsData] = await Promise.all([
           apiService.getWarehouses(),
           apiService.getRequests(),
+          apiService.getProducts(),
         ]);
 
         setWarehouses(warehousesData);
+        setProducts(productsData);
 
         let filtered = requestsData;
         if (!isAdmin && user?.warehouseId) {
@@ -53,6 +58,7 @@ export const RequestsPage = () => {
           setFormData((prev) => ({
             ...prev,
             fromWarehouseId: user.warehouseId,
+            requestType: 'transfer',
           }));
         }
       } catch (error) {
@@ -63,6 +69,16 @@ export const RequestsPage = () => {
 
     void loadRequests();
   }, [isAdmin, user?.warehouseId, formData.fromWarehouseId]);
+
+  // Для менеджера автоматически устанавливаем тип заявки как 'transfer'
+  useEffect(() => {
+    if (!isAdmin && showForm && formData.requestType !== 'transfer') {
+      setFormData((prev) => ({
+        ...prev,
+        requestType: 'transfer',
+      }));
+    }
+  }, [showForm, isAdmin, formData.requestType]);
 
   const filteredRequests = requests.filter((r) => {
     const matchStatus = filterStatus === 'all' || r.status === filterStatus;
@@ -91,119 +107,368 @@ export const RequestsPage = () => {
     }
 
     try {
-      const timestamp = new Date();
-      const newRequest: Request = {
-        id: `REQ-${timestamp.getTime()}`,
-        requestNumber: `REQ-${timestamp.getTime()}`,
-        requestType: formData.requestType,
-        status: 'pending',
-        warehouseId: formData.fromWarehouseId || user?.warehouseId || 1,
-        transferWarehouseId: formData.toWarehouseId,
-        products: formData.products,
-        createdBy: user?.id || 'unknown',
-        createdAt: timestamp,
-        notes: formData.notes,
-        priority: formData.priority,
-      };
+      if (selectedRequest && selectedRequest.status === 'pending') {
+        // Обновление существующей заявки - перезагружаем с бэкенда
+        const updatedRequests = await apiService.getRequests();
+        setRequests(updatedRequests);
+        showSuccess('Заявка успешно обновлена!');
+      } else {
+        // Создание новой заявки на бэкенде
+        const newRequest = await apiService.createRequest({
+          requestType: formData.requestType,
+          status: 'pending',
+          warehouseId: formData.fromWarehouseId || user?.warehouseId || 1,
+          transferWarehouseId: formData.toWarehouseId,
+          products: formData.products,
+          createdBy: user?.id || 'unknown',
+          notes: formData.notes,
+          priority: formData.priority,
+        });
 
-      setRequests([newRequest, ...requests]);
-      showSuccess('Заявка успешно создана!');
+        // Перезагружаем список заявок с бэкенда
+        const updatedRequests = await apiService.getRequests();
+        setRequests(updatedRequests);
+        showSuccess('Заявка успешно создана!');
+      }
       resetForm();
     } catch (error) {
-      console.error('Ошибка при создании заявки:', error);
-      showError('Ошибка при создании заявки');
+      console.error('Ошибка при создании/обновлении заявки:', error);
+      showError('Ошибка при создании/обновлении заявки');
     }
   };
 
   const resetForm = () => {
     setFormData({
-      requestType: 'transfer',
+      requestType: !isAdmin ? 'transfer' : 'transfer',
       notes: '',
       priority: 'normal',
       products: [],
       fromWarehouseId: !isAdmin && user?.warehouseId ? user.warehouseId : undefined,
       toWarehouseId: undefined,
     });
+    setSelectedRequest(null);
     setShowForm(false);
   };
 
-  const generateTTN = (request: Request) => {
-    const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    let currentY = 15;
-
-    pdf.setFontSize(16);
-    pdf.text('ТОВАРОТРАНСПОРТНАЯ НАКЛАДНАЯ (ТТН)', pageWidth / 2, currentY, { align: 'center' });
-    currentY += 10;
-
-    pdf.setFontSize(10);
-    pdf.text(`Номер: ${request.requestNumber}`, 15, currentY);
-    pdf.text(`Дата: ${new Date(request.createdAt).toLocaleDateString('ru-RU')}`, pageWidth - 50, currentY);
-    currentY += 8;
-
-    pdf.text(`Тип: ${getTypeLabel(request.requestType)}`, 15, currentY);
-    pdf.text(`Статус: ${getStatusLabel(request.status)}`, pageWidth / 2, currentY);
-    currentY += 8;
-
+  const generateTTN = async (request: Request) => {
     const fromWarehouse = warehouses.find((w) => w.id === request.warehouseId);
-    const toWarehouse = warehouses.find((w) => w.id === request.transferWarehouseId);
-
-    if (fromWarehouse) {
-      pdf.text(`От площадки: ${fromWarehouse.name}`, 15, currentY);
-      currentY += 6;
-    }
-    if (toWarehouse) {
-      pdf.text(`На площадку: ${toWarehouse.name}`, 15, currentY);
-      currentY += 6;
-    }
-
-    currentY += 8;
-    pdf.setFontSize(9);
-    pdf.text('Товары в заявке:', 15, currentY);
-    currentY += 6;
-
-    const pageMargin = 15;
-    const colWidths = { product: 60, qty: 30, location: 50, sig: 35 };
-
-    pdf.setFillColor(200, 200, 200);
-    pdf.text('Товар', pageMargin, currentY);
-    pdf.text('Кол-во', pageMargin + colWidths.product, currentY);
-    pdf.text('Место', pageMargin + colWidths.product + colWidths.qty, currentY);
-    currentY += 6;
-
+    const toWarehouse = request.transferWarehouseId ? warehouses.find((w) => w.id === request.transferWarehouseId) : null;
+    
+    let totalQuantity = 0;
     request.products.forEach((product) => {
-      pdf.setFontSize(8);
-      const productText = product.productName.substring(0, 30);
-      pdf.text(productText, pageMargin, currentY);
-      pdf.text(product.quantity.toString(), pageMargin + colWidths.product, currentY);
-      pdf.text(product.location || '-', pageMargin + colWidths.product + colWidths.qty, currentY);
-      currentY += 5;
+      totalQuantity += product.quantity;
     });
 
-    if (request.notes) {
-      currentY += 3;
-      pdf.setFontSize(9);
-      pdf.text(`Примечания: ${request.notes.substring(0, 80)}`, 15, currentY);
+    // Создаём HTML для PDF
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; color: #000;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 18px;">ООО "ЛОГИСТИЧЕСКИЙ ЦЕНТР"</h2>
+          <p style="margin: 5px 0; font-size: 12px;">АД: г. Москва, ул. Логистическая, д. 1</p>
+          <p style="margin: 5px 0; font-size: 12px;">Тел: +7 (495) 123-45-67 | Email: info@logistics.ru</p>
+          <hr style="border: none; border-top: 1px solid #000; margin: 10px 0;" />
+          <h1 style="margin: 10px 0; font-size: 16px;">ТОВАРОТРАНСПОРТНАЯ НАКЛАДНАЯ (ТТН)</h1>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">ДАННЫЕ ДОКУМЕНТА</h3>
+          <table style="width: 100%; font-size: 11px;">
+            <tr>
+              <td style="width: 50%;">Номер ТТН: ${request.requestNumber}</td>
+              <td>Дата: ${new Date(request.createdAt).toLocaleDateString('ru-RU')}</td>
+            </tr>
+            <tr>
+              <td>Тип операции: ${getTypeLabel(request.requestType)}</td>
+              <td>Статус: ${getStatusLabel(request.status)}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">СТОРОНЫ ТРАНСПОРТИРОВКИ</h3>
+          <table style="width: 100%; font-size: 11px;">
+            <tr>
+              <td style="width: 50%; padding: 5px; border: 1px solid #000; vertical-align: top;">
+                <strong>От (отправитель):</strong><br/>
+                ${fromWarehouse?.name || 'Неизвестно'}<br/>
+                <strong>Адрес:</strong> ${fromWarehouse?.location || 'Не указан'}
+              </td>
+              <td style="width: 50%; padding: 5px; border: 1px solid #000; vertical-align: top;">
+                <strong>Кому (получатель):</strong><br/>
+                ${toWarehouse?.name || 'Не указано'}<br/>
+                <strong>Адрес:</strong> ${toWarehouse?.location || 'Не указан'}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">СПИСОК ТОВАРОВ</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+            <thead>
+              <tr style="background-color: #f0f0f0;">
+                <th style="border: 1px solid #000; padding: 5px; text-align: left;">№</th>
+                <th style="border: 1px solid #000; padding: 5px; text-align: left;">Наименование товара</th>
+                <th style="border: 1px solid #000; padding: 5px; text-align: center;">Кол-во</th>
+                <th style="border: 1px solid #000; padding: 5px; text-align: left;">Место хранения</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${request.products.map((product, idx) => `
+                <tr>
+                  <td style="border: 1px solid #000; padding: 5px;">${idx + 1}</td>
+                  <td style="border: 1px solid #000; padding: 5px;">${product.productName}</td>
+                  <td style="border: 1px solid #000; padding: 5px; text-align: center;">${product.quantity}</td>
+                  <td style="border: 1px solid #000; padding: 5px;">${product.location || '-'}</td>
+                </tr>
+              `).join('')}
+              <tr style="font-weight: bold;">
+                <td colspan="2" style="border: 1px solid #000; padding: 5px; text-align: right;">ИТОГО:</td>
+                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${totalQuantity}</td>
+                <td style="border: 1px solid #000; padding: 5px;">Товаров: ${request.products.length}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        ${request.notes ? `
+          <div style="margin-bottom: 15px;">
+            <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">ПРИМЕЧАНИЯ</h3>
+            <p style="margin: 5px 0; font-size: 11px; padding: 10px; border: 1px solid #000; background-color: #fafafa;">
+              ${request.notes}
+            </p>
+          </div>
+        ` : ''}
+
+        <div style="margin-top: 30px; display: flex; justify-content: space-between;">
+          <div style="text-align: center; flex: 1;">
+            <div style="height: 40px; border-top: 1px solid #000;"></div>
+            <p style="margin: 3px 0; font-size: 10px;">Подпись отправителя</p>
+          </div>
+          <div style="text-align: center; flex: 1;">
+            <div style="height: 40px; border-top: 1px solid #000;"></div>
+            <p style="margin: 3px 0; font-size: 10px;">Подпись менеджера</p>
+          </div>
+          <div style="text-align: center; flex: 1;">
+            <div style="height: 40px; border-top: 1px solid #000;"></div>
+            <p style="margin: 3px 0; font-size: 10px;">Подпись получателя</p>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center; font-size: 9px; color: #666;">
+          <p style="margin: 0;">Документ создан: ${new Date().toLocaleString('ru-RU')}</p>
+        </div>
+      </div>
+    `;
+
+    // Создаём временный div для html2canvas
+    const element = document.createElement('div');
+    element.innerHTML = htmlContent;
+    element.style.position = 'absolute';
+    element.style.left = '-9999px';
+    element.style.width = '210mm';
+    element.style.background = 'white';
+    document.body.appendChild(element);
+
+    try {
+      // Конвертируем HTML в canvas
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      // Создаём PDF из canvas
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth - 10;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 5;
+
+      // Добавляем изображение на первую страницу
+      pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight - 10;
+
+      // Добавляем дополнительные страницы если нужно
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight + 5;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`TTN-${request.requestNumber}.pdf`);
+    } finally {
+      document.body.removeChild(element);
     }
-
-    currentY += 10;
-    pdf.setFontSize(8);
-    pdf.text('_____________________', 15, currentY);
-    pdf.text('Подпись отправителя', 15, currentY + 4);
-
-    pdf.save(`TTN-${request.requestNumber}.pdf`);
   };
 
-  const handleStatusChange = async (requestId: string, newStatus: RequestStatus) => {
+  const handleStatusChange = async (request: Request, newStatus: RequestStatus) => {
     try {
-      setRequests(
-        requests.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
+      // Извлекаем числовой ID из request.id (например: "REQ-1234567890" -> "1234567890")
+      const numericId = request.id.includes('-') ? request.id.split('-')[1] : request.id;
+      
+      const result = await apiService.updateRequestStatus(
+        numericId,
+        newStatus,
+        parseInt(user?.id || '1')
       );
-      showSuccess('Статус обновлён!');
-    } catch (error) {
+      
+      if (result) {
+        setRequests(
+          requests.map((r) => (r.id === request.id ? result : r))
+        );
+        showSuccess(`Статус изменён на ${getStatusLabel(newStatus)}`);
+      }
+    } catch (error: any) {
       console.error('Ошибка при обновлении статуса:', error);
-      showError('Ошибка при обновлении статуса');
+      const errorMessage = error.message || 'Ошибка при обновлении статуса';
+      showError(errorMessage);
     }
+  };
+
+  const canApproveRequest = (request: Request): boolean => {
+    if (isAdmin) return request.status === 'pending';
+    if (user?.role === 'manager' && request.warehouseId === user?.warehouseId) {
+      return request.status === 'pending';
+    }
+    return false;
+  };
+
+  const canCompleteRequest = (request: Request): boolean => {
+    if (isAdmin) return request.status === 'in_transit' || request.status === 'approved';
+    if (user?.role === 'manager' && request.transferWarehouseId === user?.warehouseId) {
+      return request.status === 'in_transit';
+    }
+    return false;
+  };
+
+  const canRejectRequest = (request: Request): boolean => {
+    if (isAdmin) return request.status === 'pending' || request.status === 'approved';
+    if (user?.role === 'manager' && request.warehouseId === user?.warehouseId) {
+      return request.status === 'pending';
+    }
+    return false;
+  };
+
+  const getActionButtons = (request: Request) => {
+    const buttons = [];
+
+    if (request.status === 'pending') {
+      // Кнопка редактирования доступна при статусе "Ожидание"
+      if (isAdmin || (user?.role === 'manager' && request.warehouseId === user?.warehouseId)) {
+        buttons.push(
+          <button
+            key="edit"
+            onClick={async () => {
+              const fullRequest = await apiService.getRequestById(request.id);
+              if (fullRequest) {
+                setFormData({
+                  requestType: fullRequest.requestType,
+                  notes: fullRequest.notes || '',
+                  priority: fullRequest.priority as 'low' | 'normal' | 'high',
+                  products: fullRequest.products,
+                  fromWarehouseId: fullRequest.warehouseId,
+                  toWarehouseId: fullRequest.transferWarehouseId,
+                });
+                setSelectedRequest(fullRequest);
+                setShowForm(true);
+              }
+            }}
+            className="btn-small btn-info"
+            title="Редактировать заявку"
+          >
+            ✎ Редактировать
+          </button>
+        );
+      }
+      if (canApproveRequest(request)) {
+        buttons.push(
+          <button
+            key="approve"
+            onClick={() => handleStatusChange(request, 'approved')}
+            className="btn-approve"
+            title="Одобрить заявку"
+          >
+            ✓ Одобрить
+          </button>
+        );
+      }
+      if (canRejectRequest(request)) {
+        buttons.push(
+          <button
+            key="reject"
+            onClick={() => handleStatusChange(request, 'rejected')}
+            className="btn-reject"
+            title="Отклонить заявку"
+          >
+            ✗ Отклонить
+          </button>
+        );
+      }
+    } else if (request.status === 'approved') {
+      // Кнопка возврата в ожидание для редактирования
+      if (isAdmin || (user?.role === 'manager' && request.warehouseId === user?.warehouseId)) {
+        buttons.push(
+          <button
+            key="edit-pending"
+            onClick={() => handleStatusChange(request, 'pending')}
+            className="btn-secondary"
+            title="Вернуть в ожидание для редактирования"
+          >
+            ↶ На редакцию
+          </button>
+        );
+        buttons.push(
+          <button
+            key="intransit"
+            onClick={() => handleStatusChange(request, 'in_transit')}
+            className="btn-inprogress"
+            title="Товар в пути"
+          >
+            → В пути
+          </button>
+        );
+      }
+    } else if (request.status === 'in_transit') {
+      if (canCompleteRequest(request)) {
+        buttons.push(
+          <button
+            key="complete"
+            onClick={() => handleStatusChange(request, 'completed')}
+            className="btn-complete"
+            title="Принять доставку"
+          >
+            ✓ Принято
+          </button>
+        );
+      }
+    } else if (request.status === 'rejected') {
+      if (isAdmin || (user?.role === 'manager' && request.warehouseId === user?.warehouseId)) {
+        buttons.push(
+          <button
+            key="cancel"
+            onClick={() => handleStatusChange(request, 'pending')}
+            className="btn-secondary"
+            title="Вернуть в ожидание"
+          >
+            ↶ Отмена
+          </button>
+        );
+      }
+    }
+
+    return buttons;
   };
 
   const getTypeLabel = (type: RequestType): string => {
@@ -220,6 +485,7 @@ export const RequestsPage = () => {
     const labels: Record<RequestStatus, string> = {
       pending: 'Ожидание',
       approved: 'Одобрено',
+      in_transit: 'В пути',
       completed: 'Завершено',
       rejected: 'Отклонено',
     };
@@ -267,22 +533,24 @@ export const RequestsPage = () => {
 
       {showForm && (
         <div className="form-card">
-          <h3>Создать новую заявку</h3>
+          <h3>{selectedRequest?.status === 'pending' ? `Редактирование заявки ${selectedRequest?.requestNumber}` : 'Создать новую заявку'}</h3>
           <form onSubmit={handleCreateRequest}>
             <div className="form-grid">
-              <div className="form-group">
-                <label>Тип заявки *</label>
-                <select
-                  value={formData.requestType}
-                  onChange={(e) => setFormData({ ...formData, requestType: e.target.value as RequestType })}
-                  required
-                >
-                  <option value="transfer">Передача между площадками</option>
-                  <option value="incoming">Прием товара</option>
-                  <option value="writeoff">Списание товара</option>
-                  <option value="adjustment">Корректировка</option>
-                </select>
-              </div>
+              {isAdmin && (
+                <div className="form-group">
+                  <label>Тип заявки *</label>
+                  <select
+                    value={formData.requestType}
+                    onChange={(e) => setFormData({ ...formData, requestType: e.target.value as RequestType })}
+                    required
+                  >
+                    <option value="transfer">Передача между площадками</option>
+                    <option value="incoming">Прием товара</option>
+                    <option value="writeoff">Списание товара</option>
+                    <option value="adjustment">Корректировка</option>
+                  </select>
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Приоритет *</label>
@@ -320,7 +588,16 @@ export const RequestsPage = () => {
                 </div>
               )}
 
-              {formData.requestType === 'transfer' && (
+              {!isAdmin && (
+                <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}>
+                  <label style={{ marginRight: '8px', color: 'var(--text-primary)' }}>От площадки:</label>
+                  <span style={{ padding: '8px 12px', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', borderRadius: '4px', border: '1px solid var(--border-primary)' }}>
+                    {warehouses.find((w) => w.id === formData.fromWarehouseId)?.name || 'Загрузка...'}
+                  </span>
+                </div>
+              )}
+
+              {(isAdmin ? formData.requestType === 'transfer' : true) && (
                 <div className="form-group">
                   <label>На площадку *</label>
                   <select
@@ -355,27 +632,113 @@ export const RequestsPage = () => {
                 />
               </div>
 
-              <div style={{ gridColumn: '1 / -1', padding: '12px', backgroundColor: '#ecf0f1', borderRadius: '4px' }}>
-                <p style={{ marginBottom: '12px', fontWeight: 'bold' }}>
+              <div style={{ gridColumn: '1 / -1', padding: '12px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                <p style={{ marginBottom: '12px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                   Товары в заявке: {formData.products.length}
                 </p>
+                
+                <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: 'var(--surface-primary)', borderRadius: '4px', border: '1px solid var(--border-primary)' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '12px', color: 'var(--text-primary)' }}>Добавить товар:</label>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <select
+                      id="productSelect"
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--border-primary)',
+                        fontSize: '12px',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <option value="">-- Выберите товар --</option>
+                      {apiService && products
+                        .filter(p => !formData.fromWarehouseId || p.warehouseId === formData.fromWarehouseId)
+                        .map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name} (Кол-во: {product.quantity})
+                          </option>
+                        ))}
+                    </select>
+                    <input
+                      type="number"
+                      id="productQty"
+                      min="1"
+                      defaultValue="1"
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--border-primary)',
+                        fontSize: '12px',
+                        backgroundColor: 'var(--surface-primary)',
+                        color: 'var(--text-primary)',
+                        fontFamily: 'inherit',
+                      }}
+                      placeholder="Кол-во"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const selectEl = document.getElementById('productSelect') as HTMLSelectElement;
+                        const qtyEl = document.getElementById('productQty') as HTMLInputElement;
+                        const selectedProductId = selectEl?.value;
+                        const quantity = parseInt(qtyEl?.value || '1');
+
+                        if (selectedProductId) {
+                          const product = products.find(p => p.id === selectedProductId);
+                          if (product) {
+                            setFormData({
+                              ...formData,
+                              products: [
+                                ...formData.products,
+                                {
+                                  productId: product.id,
+                                  productName: product.name,
+                                  quantity: quantity,
+                                  location: product.location,
+                                },
+                              ],
+                            });
+                            selectEl.value = '';
+                            qtyEl.value = '1';
+                          }
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        backgroundColor: 'var(--accent-primary)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Добавить в заявку
+                    </button>
+                  </div>
+                </div>
+
                 {formData.products.length > 0 && (
-                  <table style={{ width: '100%', fontSize: '12px' }}>
+                  <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left', padding: '4px' }}>Товар</th>
-                        <th style={{ textAlign: 'left', padding: '4px' }}>Кол-во</th>
-                        <th style={{ textAlign: 'left', padding: '4px' }}>Место</th>
-                        <th style={{ textAlign: 'left', padding: '4px' }}>Действие</th>
+                      <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                        <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Товар</th>
+                        <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Кол-во</th>
+                        <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Место</th>
+                        <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Действие</th>
                       </tr>
                     </thead>
                     <tbody>
                       {formData.products.map((product, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #bdc3c7' }}>
-                          <td style={{ padding: '4px' }}>{product.productName}</td>
-                          <td style={{ padding: '4px' }}>{product.quantity}</td>
-                          <td style={{ padding: '4px' }}>{product.location || '-'}</td>
-                          <td style={{ padding: '4px' }}>
+                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                          <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{product.productName}</td>
+                          <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{product.quantity}</td>
+                          <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{product.location || '-'}</td>
+                          <td style={{ padding: '8px' }}>
                             <button
                               type="button"
                               onClick={() => {
@@ -385,16 +748,16 @@ export const RequestsPage = () => {
                                 });
                               }}
                               style={{
-                                padding: '2px 6px',
+                                padding: '4px 8px',
                                 fontSize: '11px',
-                                backgroundColor: '#e74c3c',
+                                backgroundColor: 'var(--accent-danger)',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '3px',
                                 cursor: 'pointer',
                               }}
                             >
-                              Удал.
+                              Удалить
                             </button>
                           </td>
                         </tr>
@@ -402,39 +765,11 @@ export const RequestsPage = () => {
                     </tbody>
                   </table>
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData({
-                      ...formData,
-                      products: [
-                        ...formData.products,
-                        {
-                          productId: `PROD-${Date.now()}`,
-                          productName: '',
-                          quantity: 1,
-                        },
-                      ],
-                    });
-                  }}
-                  style={{
-                    marginTop: '8px',
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    backgroundColor: '#3498db',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  + Добавить товар
-                </button>
               </div>
             </div>
 
             <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '16px' }}>
-              Создать заявку
+              {selectedRequest?.status === 'pending' ? 'Обновить заявку' : 'Создать заявку'}
             </button>
           </form>
         </div>
@@ -448,6 +783,7 @@ export const RequestsPage = () => {
           <option value="all">Все статусы</option>
           <option value="pending">Ожидание</option>
           <option value="approved">Одобрено</option>
+          <option value="in_transit">В пути</option>
           <option value="completed">Завершено</option>
           <option value="rejected">Отклонено</option>
         </select>
@@ -471,7 +807,7 @@ export const RequestsPage = () => {
 
       <div className="requests-list">
         {filteredRequests.length > 0 ? (
-          <table>
+          <table className="data-table requests-table">
             <thead>
               <tr>
                 <th>Номер</th>
@@ -487,25 +823,36 @@ export const RequestsPage = () => {
             <tbody>
               {filteredRequests.map((request) => {
                 const fromWarehouse = warehouses.find((w) => w.id === request.warehouseId);
+                const toWarehouse = request.transferWarehouseId ? warehouses.find((w) => w.id === request.transferWarehouseId) : null;
+                const statusColor = {
+                  pending: '#f39c12',
+                  approved: '#3498db',
+                  in_transit: '#9b59b6',
+                  completed: '#27ae60',
+                  rejected: '#e74c3c',
+                }[request.status] || '#95a5a6';
+
                 return (
-                  <tr key={request.id}>
-                    <td className="request-id">{request.requestNumber}</td>
+                  <tr key={request.id} style={{ borderLeft: `4px solid ${statusColor}` }}>
+                    <td className="request-id" style={{ fontWeight: 'bold' }}>{request.requestNumber}</td>
                     <td>{getTypeLabel(request.requestType)}</td>
-                    <td>{request.products.length}</td>
+                    <td style={{ textAlign: 'center' }}>{request.products.length}</td>
                     <td>
-                      <select
-                        value={request.status}
-                        onChange={(e) => handleStatusChange(request.id, e.target.value as RequestStatus)}
-                        className="status-select"
-                        style={{ padding: '4px' }}
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          backgroundColor: statusColor,
+                          color: 'white',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                        }}
                       >
-                        <option value="pending">Ожидание</option>
-                        <option value="approved">Одобрено</option>
-                        <option value="completed">Завершено</option>
-                        <option value="rejected">Отклонено</option>
-                      </select>
+                        {getStatusLabel(request.status)}
+                      </span>
                     </td>
-                    <td>
+                    <td style={{ textAlign: 'center' }}>
                       <span
                         style={{
                           display: 'inline-block',
@@ -513,46 +860,48 @@ export const RequestsPage = () => {
                           borderRadius: '4px',
                           backgroundColor: getPriorityColor(request.priority),
                           color: 'white',
-                          fontSize: '12px',
+                          fontSize: '11px',
                           fontWeight: 'bold',
                         }}
                       >
                         {request.priority === 'high' ? 'В' : request.priority === 'normal' ? 'О' : 'Н'}
                       </span>
                     </td>
-                    <td>{fromWarehouse?.name || 'Неизвестно'}</td>
-                    <td>{new Date(request.createdAt).toLocaleDateString('ru-RU')}</td>
-                    <td style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => setSelectedRequest(request)}
-                        className="btn-small"
-                        style={{
-                          padding: '4px 8px',
-                          fontSize: '12px',
-                          backgroundColor: '#3498db',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Просмотр
-                      </button>
-                      <button
-                        onClick={() => generateTTN(request)}
-                        className="btn-small"
-                        style={{
-                          padding: '4px 8px',
-                          fontSize: '12px',
-                          backgroundColor: '#27ae60',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        ТТН
-                      </button>
+                    <td>
+                      <div style={{ fontSize: '12px' }}>
+                        <div>{fromWarehouse?.name || 'Неизвестно'}</div>
+                        {toWarehouse && <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>→ {toWarehouse.name}</div>}
+                      </div>
+                    </td>
+                    <td style={{ fontSize: '12px' }}>{new Date(request.createdAt).toLocaleDateString('ru-RU')}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <button
+                          onClick={async () => {
+                            const fullRequest = await apiService.getRequestById(request.id);
+                            if (fullRequest) {
+                              setSelectedRequest(fullRequest);
+                            }
+                          }}
+                          className="btn-small btn-info"
+                          title="Просмотр деталей"
+                        >
+                          👁️
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const fullRequest = await apiService.getRequestById(request.id);
+                            if (fullRequest) {
+                              generateTTN(fullRequest);
+                            }
+                          }}
+                          className="btn-small btn-success"
+                          title="Скачать ТТН"
+                        >
+                          📄
+                        </button>
+                        {getActionButtons(request)}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -574,7 +923,7 @@ export const RequestsPage = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            backgroundColor: 'rgba(0,0,0,0.7)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -585,85 +934,152 @@ export const RequestsPage = () => {
         >
           <div
             style={{
-              backgroundColor: '#fff',
+              backgroundColor: '#1e1e1e',
+              color: '#e0e0e0',
               padding: '24px',
               borderRadius: '8px',
-              maxWidth: '600px',
+              maxWidth: '700px',
               width: '90%',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
               margin: '40px auto',
+              border: '1px solid #404040',
+              maxHeight: '90vh',
+              overflowY: 'auto',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3>Заявка {selectedRequest.requestNumber}</h3>
-            <p>
-              <strong>Тип:</strong> {getTypeLabel(selectedRequest.requestType)}
-            </p>
-            <p>
-              <strong>Статус:</strong> {getStatusLabel(selectedRequest.status)}
-            </p>
-            <p>
-              <strong>Приоритет:</strong>{' '}
-              {selectedRequest.priority === 'high' ? 'Высокий' : selectedRequest.priority === 'normal' ? 'Обычный' : 'Низкий'}
-            </p>
-            <p>
-              <strong>Дата создания:</strong>{' '}
-              {new Date(selectedRequest.createdAt).toLocaleDateString('ru-RU')}
-            </p>
-            {selectedRequest.notes && (
-              <p>
-                <strong>Примечания:</strong> {selectedRequest.notes}
-              </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, color: '#4ECDC4' }}>{selectedRequest.requestNumber}</h2>
+              <span
+                style={{
+                  display: 'inline-block',
+                  padding: '4px 12px',
+                  borderRadius: '4px',
+                  backgroundColor: '#404040',
+                  color: '#4ECDC4',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {getStatusLabel(selectedRequest.status)}
+              </span>
+            </div>
+
+            <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>Тип</p>
+                  <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--text-primary)' }}>{getTypeLabel(selectedRequest.requestType)}</p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>Приоритет</p>
+                  <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: selectedRequest.priority === 'high' ? '#e74c3c' : selectedRequest.priority === 'normal' ? '#f39c12' : '#3498db',
+                        marginRight: '8px',
+                      }}
+                    />
+                    {selectedRequest.priority === 'high' ? 'Высокий' : selectedRequest.priority === 'normal' ? 'Обычный' : 'Низкий'}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>Создана</p>
+                  <p style={{ margin: 0, color: 'var(--text-primary)' }}>{new Date(selectedRequest.createdAt).toLocaleDateString('ru-RU')}</p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>Автор</p>
+                  <p style={{ margin: 0, color: 'var(--text-primary)' }}>{selectedRequest.createdBy}</p>
+                </div>
+              </div>
+            </div>
+
+            {selectedRequest.transferWarehouseId && (
+              <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Маршрут</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ color: 'var(--text-primary)' }}>{warehouses.find((w) => w.id === selectedRequest.warehouseId)?.name || 'Неизвестно'}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>→</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{warehouses.find((w) => w.id === selectedRequest.transferWarehouseId)?.name || 'Неизвестно'}</span>
+                </div>
+              </div>
             )}
-            <p>
-              <strong>Товары ({selectedRequest.products.length}):</strong>
-            </p>
-            <table style={{ width: '100%', fontSize: '13px', marginBottom: '16px' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '6px' }}>Товар</th>
-                  <th style={{ textAlign: 'left', padding: '6px' }}>Кол-во</th>
-                  <th style={{ textAlign: 'left', padding: '6px' }}>Место</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedRequest.products.map((product, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #ecf0f1' }}>
-                    <td style={{ padding: '6px' }}>{product.productName}</td>
-                    <td style={{ padding: '6px' }}>{product.quantity}</td>
-                    <td style={{ padding: '6px' }}>{product.location || '-'}</td>
+
+            {selectedRequest.notes && (
+              <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>Примечания</p>
+                <p style={{ margin: 0, color: 'var(--text-primary)' }}>{selectedRequest.notes}</p>
+              </div>
+            )}
+
+            <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Товары ({selectedRequest.products.length})</p>
+              <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                    <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Товар</th>
+                    <th style={{ textAlign: 'right', padding: '8px', color: 'var(--text-secondary)' }}>Кол-во</th>
+                    <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-secondary)' }}>Место</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                </thead>
+                <tbody>
+                  {selectedRequest.products.length > 0 ? (
+                    selectedRequest.products.map((product, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                        <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{product.productName}</td>
+                        <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--text-primary)' }}>{product.quantity} шт</td>
+                        <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{product.location || '-'}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} style={{ padding: '8px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        Товары не добавлены
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
               <button
                 onClick={() => generateTTN(selectedRequest)}
-                className="btn-primary"
                 style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#27ae60',
+                  padding: '10px 16px',
+                  backgroundColor: 'var(--accent-primary)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   flex: 1,
+                  fontWeight: 'bold',
+                  transition: 'background-color 0.3s',
                 }}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'var(--accent-primary-hover)')}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'var(--accent-primary)')}
               >
-                Скачать ТТН
+                📄 Скачать ТТН
               </button>
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="btn-secondary"
                 style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#95a5a6',
-                  color: 'white',
-                  border: 'none',
+                  padding: '10px 16px',
+                  backgroundColor: 'var(--surface-primary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-primary)',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   flex: 1,
+                  fontWeight: 'bold',
+                  transition: 'background-color 0.3s',
                 }}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-secondary)')}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'var(--surface-primary)')}
               >
                 Закрыть
               </button>

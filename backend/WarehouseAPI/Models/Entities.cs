@@ -145,12 +145,14 @@ public class Request
 {
     public int Id { get; set; }
     public int UserId { get; set; }
-    public int ProductId { get; set; }
     public int WarehouseId { get; set; } // FK to Warehouse.Id
     public int? TransferWarehouseId { get; set; } // FK to Warehouse.Id
-    public int Quantity { get; set; }
-    public string Status { get; set; } = "pending"; // pending, approved, rejected, completed
+    public string Status { get; set; } = "pending"; // pending, approved, in_transit, rejected, completed
     public string? Notes { get; set; }
+    public string? ApprovedBy { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string? CompletedBy { get; set; }
+    public DateTime? CompletedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
@@ -158,4 +160,20 @@ public class Request
     public Warehouse? Warehouse { get; set; }
     [JsonIgnore]
     public Warehouse? TransferWarehouse { get; set; }
+    [JsonInclude]
+    public ICollection<RequestProduct> RequestProducts { get; set; } = new List<RequestProduct>();
+}
+
+public class RequestProduct
+{
+    public int Id { get; set; }
+    public int RequestId { get; set; }
+    public int ProductId { get; set; }
+    public int Quantity { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [JsonIgnore]
+    public Request Request { get; set; } = null!;
+    public Product Product { get; set; } = null!;
 }

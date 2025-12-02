@@ -12,7 +12,7 @@ export interface Category {
 
 // Типы запросов
 export type RequestType = 'incoming' | 'writeoff' | 'transfer' | 'adjustment';
-export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'completed';
+export type RequestStatus = 'pending' | 'approved' | 'in_transit' | 'rejected' | 'completed';
 export type Priority = 'low' | 'normal' | 'high';
 export type EntityType = 'product' | 'request' | 'user' | 'warehouse' | 'other';
 

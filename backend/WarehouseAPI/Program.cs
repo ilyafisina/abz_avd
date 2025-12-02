@@ -29,17 +29,9 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .SetIsOriginAllowed(origin => 
-            {
-                // Allow localhost, 127.0.0.1, and 172.x.x.x (Docker networks)
-                return origin.Contains("localhost") || 
-                       origin.Contains("127.0.0.1") ||
-                       origin.Contains("172.") ||
-                       origin.Contains("192.168.");
-            })
+            .AllowAnyOrigin()
             .AllowAnyMethod()
-            .AllowAnyHeader()
-            .AllowCredentials();
+            .AllowAnyHeader();
     });
 });
 
