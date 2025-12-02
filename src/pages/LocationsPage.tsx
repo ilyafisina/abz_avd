@@ -1485,8 +1485,12 @@ export const LocationsPage = () => {
                   <tbody>
                     {transfers
                       .filter(t => {
-                        // Фильтр по типу если выбрана площадка
-                        if (selectedWarehouse && transferFilters.type !== 'all') {
+                        // Если выбрана площадка - показываем только перемещения, относящиеся к ней
+                        if (selectedWarehouse) {
+                          const isRelevant = t.fromWarehouseId === selectedWarehouse || t.toWarehouseId === selectedWarehouse;
+                          if (!isRelevant) return false;
+                          
+                          // Фильтр по типу перемещения
                           if (transferFilters.type === 'incoming' && t.toWarehouseId !== selectedWarehouse) return false;
                           if (transferFilters.type === 'outgoing' && t.fromWarehouseId !== selectedWarehouse) return false;
                         }

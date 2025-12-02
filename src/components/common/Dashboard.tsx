@@ -32,9 +32,11 @@ export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedWarehouse, setSelectedWarehouse] = useState<number | 'all'>(() => {
-    // Складовщик видит только свой склад
-    // Менеджер видит свой склад по умолчанию
+    // Менеджер и складовщик видят только свой склад
     // Администратор видит все
+    if (user?.role === 'manager' || user?.role === 'warehouseman') {
+      return user?.warehouseId || 'all';
+    }
     return 'all';
   });
 
@@ -56,12 +58,18 @@ export const Dashboard: React.FC = () => {
       let filteredProducts = productsData;
       let filteredRequests = requestsData;
 
-      if (user?.role === 'manager' && selectedWarehouse !== 'all') {
-        filteredProducts = productsData.filter(p => p.warehouseId === selectedWarehouse);
-        filteredRequests = requestsData.filter(r => r.warehouseId === selectedWarehouse);
-      } else if (user?.role === 'warehouseman') {
+      if (user?.role === 'manager') {
+        // Менеджер видит только свой склад
         filteredProducts = productsData.filter(p => p.warehouseId === user.warehouseId);
         filteredRequests = requestsData.filter(r => r.warehouseId === user.warehouseId);
+      } else if (user?.role === 'warehouseman') {
+        // Складовщик видит только свой склад
+        filteredProducts = productsData.filter(p => p.warehouseId === user.warehouseId);
+        filteredRequests = requestsData.filter(r => r.warehouseId === user.warehouseId);
+      } else if (user?.role === 'admin' && selectedWarehouse !== 'all') {
+        // Админ может выбрать конкретный склад
+        filteredProducts = productsData.filter(p => p.warehouseId === selectedWarehouse);
+        filteredRequests = requestsData.filter(r => r.warehouseId === selectedWarehouse);
       }
 
       const lowStockCount = filteredProducts.filter(p => p.quantity <= p.minQuantity).length;
@@ -116,7 +124,7 @@ export const Dashboard: React.FC = () => {
           <p className="subtitle">Полный обзор системы управления складом</p>
         </div>
         <div className="header-controls">
-          {(user?.role === 'manager' || user?.role === 'admin') && (
+          {user?.role === 'admin' && (
             <select 
               value={selectedWarehouse} 
               onChange={(e) => setSelectedWarehouse(e.target.value === 'all' ? 'all' : Number(e.target.value))}
@@ -128,7 +136,7 @@ export const Dashboard: React.FC = () => {
               ))}
             </select>
           )}
-          {user?.role === 'warehouseman' && (
+          {(user?.role === 'manager' || user?.role === 'warehouseman') && (
             <div className="warehouse-label">
               Склад: <strong>{warehouses.find(w => w.id === user.warehouseId)?.name || 'Неизвестно'}</strong>
             </div>
