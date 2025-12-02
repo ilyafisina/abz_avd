@@ -1,41 +1,57 @@
 import { useState, useEffect } from 'react';
-import type { Product, CategorySummary, Warehouse } from '../types';
+import type { Product, CategorySummary, Warehouse, Request, User } from '../types';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/useAuth';
 import './Pages.css';
-import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
 
 export const ReportsPage = () => {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportType, setReportType] = useState('inventory');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [userWarehouse, setUserWarehouse] = useState<Warehouse | null>(null);
 
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadData = async () => {
       setLoading(true);
-      const data = await apiService.getProducts();
-      
+      const [productsData, requestsData, usersData, warehousesData] = await Promise.all([
+        apiService.getProducts(),
+        apiService.getRequests(),
+        apiService.getUsers?.() || Promise.resolve([]),
+        apiService.getWarehouses?.() || Promise.resolve([]),
+      ]);
+
       // Фильтруем по площадке пользователя
-      let filtered = data;
-      if (user && user.role !== 'admin' && user.warehouse) {
-        // Менеджер и складовщик видят только свою площадку
-        filtered = data.filter(p => p.warehouse === user.warehouse);
-        
-        // Находим информацию о площадке пользователя
-        const warehouse = await apiService.getWarehouseById(user.warehouse);
+      let filteredProducts = productsData;
+      let filteredRequests = requestsData;
+
+      if (user && user.role !== 'admin') {
+        const warehouseId = user.warehouseId || (typeof user.warehouse === 'object' ? (user.warehouse as Warehouse).id : user.warehouse);
+        filteredProducts = productsData.filter(p => {
+          const pWarehouseId = typeof p.warehouse === 'object' ? (p.warehouse as Warehouse).id : p.warehouse;
+          return p.warehouseId === warehouseId || pWarehouseId === warehouseId;
+        });
+        filteredRequests = requestsData.filter(r => {
+          const rWarehouseId = typeof r.warehouse === 'object' ? (r.warehouse as Warehouse).id : r.warehouse;
+          return r.warehouseId === warehouseId || rWarehouseId === warehouseId;
+        });
+
+        const warehouse = warehousesData.find(w => w.id === warehouseId);
         setUserWarehouse(warehouse || null);
-      } else if (user?.role === 'admin') {
-        // Админ видит все, но мы можем показать информацию о выбранной площадке
-        setUserWarehouse(null);
       }
-      
-      setProducts(filtered);
+
+      setProducts(filteredProducts);
+      setRequests(filteredRequests);
+      setUsers(usersData);
       setLoading(false);
     };
-    loadProducts();
+    loadData();
   }, [user]);
 
   const calculateStats = () => {
@@ -48,7 +64,7 @@ export const ReportsPage = () => {
     const totalQuantity = filtered.reduce((sum, p) => sum + p.quantity, 0);
     const totalValue = filtered.reduce((sum, p) => sum + (p.quantity * p.price), 0);
     const lowStockItems = filtered.filter(p => p.quantity <= p.minQuantity);
-    
+
     // Группировка по категориям
     const categoryStats: { [key: string]: CategorySummary } = {};
     products.forEach(p => {
@@ -77,172 +93,129 @@ export const ReportsPage = () => {
 
   const stats = calculateStats();
 
-  const exportToPDF = () => {
-    const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    let currentY = 15;
-    const pageMargin = 15;
-    const colWidth = (pageWidth - 2 * pageMargin) / 8;
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+    const sheets: { [key: string]: unknown[][] } = {};
 
-    // Заголовок
-    pdf.setFontSize(16);
-    pdf.text('Отчёт о товарах', pageWidth / 2, currentY, { align: 'center' });
-    currentY += 10;
-
-    // Информация о площадке (если не админ)
-    if (userWarehouse) {
-      pdf.setFontSize(10);
-      pdf.text(`Площадка: ${userWarehouse.name}`, pageMargin, currentY);
-      pdf.text(`Адрес: ${userWarehouse.location}`, pageMargin, currentY + 5);
-      currentY += 15;
-    }
-
-    // Дата создания отчёта
-    pdf.setFontSize(9);
-    pdf.text(`Дата создания: ${new Date().toLocaleDateString('ru-RU')}`, pageMargin, currentY);
-    currentY += 8;
-
-    if (reportType === 'inventory') {
-      const filtered = selectedCategory === 'all' 
+    // Определяем какие данные экспортировать в зависимости от типа отчёта
+    if (reportType === 'inventory' || reportType === 'full') {
+      const productsData = (selectedCategory === 'all' 
         ? products 
-        : products.filter(p => p.category === selectedCategory);
+        : products.filter(p => p.category === selectedCategory)
+      ).map(p => ({
+        'Название': p.name,
+        'SKU': p.sku,
+        'Категория': p.category,
+        'Количество': p.quantity,
+        'Минимум': p.minQuantity,
+        'Место': p.location,
+        'Цена': p.price,
+        'Сумма': p.quantity * p.price,
+      }));
 
-      // Таблица
-      pdf.setFontSize(9);
-      
-      // Заголовок таблицы
-      pdf.setFillColor(200, 200, 200);
-      pdf.setFontSize(8);
-      const headers = ['Название', 'SKU', 'Категория', 'Кол-во', 'Мин.', 'Место', 'Цена', 'Сумма'];
-      let x = pageMargin;
-      headers.forEach(header => {
-        pdf.rect(x, currentY, colWidth, 5, 'F');
-        pdf.text(header, x + 1, currentY + 3.5, { maxWidth: colWidth - 2 });
-        x += colWidth;
-      });
-      currentY += 5;
+      sheets['Товары'] = [
+        Object.keys(productsData[0] || {}),
+        ...productsData.map(p => Object.values(p)),
+      ];
+    }
 
-      // Строки данных
-      filtered.forEach(p => {
-        const sum = p.quantity * p.price;
-        const row = [p.name, p.sku, p.category, p.quantity.toString(), p.minQuantity.toString(), p.location, `₽${p.price}`, `₽${sum}`];
-        
-        if (currentY > pageHeight - pageMargin - 10) {
-          pdf.addPage();
-          currentY = pageMargin;
-        }
-
-        x = pageMargin;
-        row.forEach((cell) => {
-          pdf.text(cell, x + 1, currentY + 3.5, { maxWidth: colWidth - 2 });
-          pdf.rect(x, currentY, colWidth, 5);
-          x += colWidth;
-        });
-        currentY += 5;
-      });
-    } else if (reportType === 'category') {
-      const categoryStats: { [key: string]: CategorySummary } = {};
-      products.forEach(p => {
-        if (!categoryStats[p.category]) {
-          categoryStats[p.category] = {
-            category: p.category,
-            productCount: 0,
-            totalQuantity: 0,
-            totalValue: 0,
-          };
-        }
-        categoryStats[p.category].productCount += 1;
-        categoryStats[p.category].totalQuantity += p.quantity;
-        categoryStats[p.category].totalValue += p.quantity * p.price;
-      });
-
-      pdf.setFontSize(8);
-      
-      // Заголовок таблицы
-      pdf.setFillColor(200, 200, 200);
-      const headers = ['Категория', 'Товаров', 'Общее кол-во', 'Общая стоимость', 'Средн. стоимость'];
-      const colW = (pageWidth - 2 * pageMargin) / headers.length;
-      let x = pageMargin;
-      headers.forEach(header => {
-        pdf.rect(x, currentY, colW, 5, 'F');
-        pdf.text(header, x + 1, currentY + 3.5, { maxWidth: colW - 2 });
-        x += colW;
-      });
-      currentY += 5;
-
-      // Строки данных
-      Object.values(categoryStats).forEach(cat => {
-        const row = [cat.category, cat.productCount.toString(), cat.totalQuantity.toString(), `₽${cat.totalValue}`, `₽${(cat.totalValue / cat.productCount).toFixed(2)}`];
-        
-        if (currentY > pageHeight - pageMargin - 10) {
-          pdf.addPage();
-          currentY = pageMargin;
-        }
-
-        x = pageMargin;
-        row.forEach((cell) => {
-          pdf.text(cell, x + 1, currentY + 3.5, { maxWidth: colW - 2 });
-          pdf.rect(x, currentY, colW, 5);
-          x += colW;
-        });
-        currentY += 5;
-      });
-    } else if (reportType === 'lowstock') {
-      const lowStockItems = products.filter(p => p.quantity <= p.minQuantity);
-
-      if (lowStockItems.length > 0) {
-        pdf.setFontSize(8);
-        
-        // Заголовок таблицы
-        pdf.setFillColor(200, 200, 200);
-        const headers = ['Название', 'SKU', 'Категория', 'Текущее', 'Минимум', 'Дефицит', 'Место'];
-        const colW = (pageWidth - 2 * pageMargin) / headers.length;
-        let x = pageMargin;
-        headers.forEach(header => {
-          pdf.rect(x, currentY, colW, 5, 'F');
-          pdf.text(header, x + 1, currentY + 3.5, { maxWidth: colW - 2 });
-          x += colW;
-        });
-        currentY += 5;
-
-        // Строки данных
-        lowStockItems.forEach(product => {
-          const row = [product.name, product.sku, product.category, product.quantity.toString(), product.minQuantity.toString(), (product.minQuantity - product.quantity).toString(), product.location];
-          
-          if (currentY > pageHeight - pageMargin - 10) {
-            pdf.addPage();
-            currentY = pageMargin;
-          }
-
-          x = pageMargin;
-          row.forEach((cell) => {
-            pdf.text(cell, x + 1, currentY + 3.5, { maxWidth: colW - 2 });
-            pdf.rect(x, currentY, colW, 5);
-            x += colW;
-          });
-          currentY += 5;
-        });
-      } else {
-        pdf.setFontSize(12);
-        pdf.text('Все товары имеют достаточный запас', pageMargin, currentY);
+    if (reportType === 'transfers' || reportType === 'full') {
+      let filteredRequests = requests;
+      if (dateFrom) {
+        filteredRequests = filteredRequests.filter(r => 
+          new Date(r.createdAt) >= new Date(dateFrom)
+        );
       }
+      if (dateTo) {
+        filteredRequests = filteredRequests.filter(r => 
+          new Date(r.createdAt) <= new Date(dateTo)
+        );
+      }
+
+      const transfersData = filteredRequests.map(r => {
+        const creator = users.find(u => u.id === r.createdBy || u.id === (r as Request & { userId: string }).userId);
+        return {
+          'ID': r.id,
+          'Статус': r.status,
+          'Дата создания': new Date(r.createdAt).toLocaleDateString('ru-RU'),
+          'Создал': creator ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() : 'Неизвестно',
+          'Примечание': (r as Request & { notes: string }).notes || '-',
+        };
+      });
+
+      sheets['Перемещения'] = [
+        transfersData.length > 0 ? Object.keys(transfersData[0]) : [],
+        ...transfersData.map(t => Object.values(t)),
+      ];
     }
 
-    // Добавляем номер страницы
-    const pageCount = pdf.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i);
-      pdf.setFontSize(8);
-      pdf.text(
-        `Стр. ${i} из ${pageCount}`,
-        pageWidth / 2,
-        pageHeight - 10,
-        { align: 'center' }
-      );
+    if (reportType === 'category' || reportType === 'full') {
+      const categoryData = stats.categoryStats.map(cat => ({
+        'Категория': cat.category,
+        'Товаров': cat.productCount,
+        'Общее кол-во': cat.totalQuantity,
+        'Общая стоимость': cat.totalValue,
+        'Средняя стоимость': (cat.totalValue / cat.productCount).toFixed(2),
+      }));
+
+      sheets['Категории'] = [
+        Object.keys(categoryData[0] || {}),
+        ...categoryData.map(c => Object.values(c)),
+      ];
     }
 
-    pdf.save(`report_${new Date().toISOString().split('T')[0]}.pdf`);
+    if (reportType === 'lowstock' || reportType === 'full') {
+      const lowStockData = stats.lowStockItems.map(p => ({
+        'Название': p.name,
+        'SKU': p.sku,
+        'Категория': p.category,
+        'Текущее': p.quantity,
+        'Минимум': p.minQuantity,
+        'Дефицит': p.minQuantity - p.quantity,
+        'Место': p.location,
+      }));
+
+      sheets['Критические запасы'] = [
+        Object.keys(lowStockData[0] || {}),
+        ...lowStockData.map(l => Object.values(l)),
+      ];
+    }
+
+    if (reportType === 'users' || reportType === 'full') {
+      const usersData = users.map(u => ({
+        'ФИО': `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+        'Логин': u.username,
+        'Роль': u.role,
+        'Email': u.email || '-',
+      }));
+
+      sheets['Пользователи'] = [
+        Object.keys(usersData[0] || {}),
+        ...usersData.map(u => Object.values(u)),
+      ];
+    }
+
+    // Создаём рабочую книгу
+    Object.entries(sheets).forEach(([sheetName, data]) => {
+      const ws = XLSX.utils.aoa_to_sheet(data as unknown[][]);
+
+      // Устанавливаем ширину колонок
+      const colWidths = (data[0] as unknown[]).map((_, idx) => {
+        const maxLength = Math.max(
+          ...(data as unknown[][]).map(row => 
+            String(row[idx] || '').length
+          )
+        );
+        return maxLength + 2;
+      });
+      ws['!cols'] = colWidths.map(w => ({ wch: Math.min(w, 50) }));
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    // Сохраняем файл
+    const fileName = `report_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
   if (loading) {
@@ -256,27 +229,65 @@ export const ReportsPage = () => {
         <p>{userWarehouse ? `Площадка: ${userWarehouse.name}` : 'Анализ данных склада и товаров'}</p>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-group">
-          <label>Тип отчёта</label>
-          <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="filter-select">
-            <option value="inventory">Инвентарь товаров</option>
-            <option value="category">По категориям</option>
-            <option value="lowstock">Товары с низким запасом</option>
-          </select>
-        </div>
-        {reportType === 'inventory' && (
+      <div className="report-controls">
+        <div className="control-section">
+          <h3>Выбор отчёта</h3>
           <div className="filter-group">
-            <label>Категория</label>
-            <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="filter-select">
-              <option value="all">Все категории</option>
-              {Array.from(new Set(products.map(p => p.category))).map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
+            <label>Тип отчёта</label>
+            <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="filter-select">
+              <option value="inventory">Инвентарь товаров</option>
+              <option value="transfers">Перемещения</option>
+              <option value="category">По категориям</option>
+              <option value="lowstock">Товары с низким запасом</option>
+              <option value="users">Пользователи</option>
+              <option value="full">Полный отчёт (все данные)</option>
             </select>
           </div>
-        )}
-        <button className="filter-btn" onClick={exportToPDF}>Экспортировать PDF</button>
+
+          {reportType === 'inventory' && (
+            <div className="filter-group">
+              <label>Категория</label>
+              <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="filter-select">
+                <option value="all">Все категории</option>
+                {Array.from(new Set(products.map(p => p.category))).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {reportType === 'transfers' && (
+            <>
+              <div className="filter-group">
+                <label>Дата от</label>
+                <input 
+                  type="date" 
+                  value={dateFrom} 
+                  onChange={(e) => setDateFrom(e.target.value)} 
+                  className="filter-input"
+                />
+              </div>
+              <div className="filter-group">
+                <label>Дата до</label>
+                <input 
+                  type="date" 
+                  value={dateTo} 
+                  onChange={(e) => setDateTo(e.target.value)} 
+                  className="filter-input"
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="control-section">
+          <h3>Экспорт</h3>
+          <div className="button-group">
+            <button className="btn btn-primary" onClick={exportToExcel}>
+              📊 Экспорт в Excel
+            </button>
+          </div>
+        </div>
       </div>
 
       {reportType === 'inventory' && (
@@ -328,6 +339,53 @@ export const ReportsPage = () => {
                       <td>{product.location}</td>
                       <td>₽{product.price.toLocaleString()}</td>
                       <td>₽{sum.toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {reportType === 'transfers' && (
+        <>
+          <div className="page-stats">
+            <div className="stat-item">
+              <span className="stat-label">Всего перемещений:</span>
+              <span className="stat-value">{requests.length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Ожидают подтверждения:</span>
+              <span className="stat-value">{requests.filter(r => r.status === 'pending').length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Завершённых:</span>
+              <span className="stat-value">{requests.filter(r => r.status === 'completed').length}</span>
+            </div>
+          </div>
+
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Статус</th>
+                  <th>Дата</th>
+                  <th>Создал</th>
+                  <th>Примечание</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map(r => {
+                  const creator = users.find(u => u.id === r.createdBy || u.id === (r as Request & { userId: string }).userId);
+                  return (
+                    <tr key={r.id}>
+                      <td>#{r.id}</td>
+                      <td><span className={`status-badge status-${r.status}`}>{r.status}</span></td>
+                      <td>{new Date(r.createdAt).toLocaleDateString('ru-RU')}</td>
+                      <td>{creator ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() : 'Неизвестно'}</td>
+                      <td>{(r as Request & { notes: string }).notes || '-'}</td>
                     </tr>
                   );
                 })}
@@ -433,6 +491,61 @@ export const ReportsPage = () => {
             </div>
           )}
         </>
+      )}
+
+      {reportType === 'users' && (
+        <>
+          <div className="page-stats">
+            <div className="stat-item">
+              <span className="stat-label">Всего пользователей:</span>
+              <span className="stat-value">{users.length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Администраторов:</span>
+              <span className="stat-value">{users.filter(u => u.role === 'admin').length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Менеджеров:</span>
+              <span className="stat-value">{users.filter(u => u.role === 'manager').length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Складовщиков:</span>
+              <span className="stat-value">{users.filter(u => u.role === 'warehouseman').length}</span>
+            </div>
+          </div>
+
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ФИО</th>
+                  <th>Логин</th>
+                  <th>Роль</th>
+                  <th>Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(u => (
+                  <tr key={u.id}>
+                    <td>{`${u.firstName || ''} ${u.lastName || ''}`.trim()}</td>
+                    <td>{u.username}</td>
+                    <td><span className={`role-badge role-${u.role}`}>{u.role}</span></td>
+                    <td>{u.email || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {reportType === 'full' && (
+        <div className="full-report">
+          <p className="info-text">
+            Полный отчёт содержит все данные и будет экспортирован в Excel с несколькими листами:
+            Товары, Перемещения, Категории, Критические запасы и Пользователи.
+          </p>
+        </div>
       )}
     </div>
   );

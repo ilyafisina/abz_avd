@@ -7,9 +7,7 @@ import { Layout } from './components/layout/Layout';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
-import { WarehousemanDashboard } from './components/warehouseman/WarehousemanDashboard';
-import { ManagerDashboard } from './components/manager/ManagerDashboard';
-import { AdminDashboard } from './components/admin/AdminDashboard';
+import { Dashboard } from './components/common/Dashboard';
 import { ProductsPage } from './pages/ProductsPage';
 import { PrintProductsPage } from './pages/PrintProductsPage';
 import { RequestsPage } from './pages/RequestsPage';
@@ -30,17 +28,7 @@ const DashboardRouter = () => {
       <Routes>
         <Route
           path="/dashboard"
-          element={
-            user?.role === 'warehouseman' ? (
-              <WarehousemanDashboard />
-            ) : user?.role === 'manager' ? (
-              <ManagerDashboard />
-            ) : user?.role === 'admin' ? (
-              <AdminDashboard />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
+          element={<Dashboard />}
         />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/print-products" element={<PrintProductsPage />} />

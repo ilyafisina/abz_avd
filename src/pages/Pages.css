@@ -1898,3 +1898,165 @@
   background-color: #dc2626;
   box-shadow: 0 2px 6px rgba(220, 38, 38, 0.2);
 }
+
+/* Report Controls */
+.report-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 24px;
+  background: var(--surface-primary);
+  border-bottom: 1px solid var(--border-primary);
+  margin-bottom: 24px;
+  border-radius: 8px;
+}
+
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.control-section h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.filter-select,
+.filter-input {
+  padding: 10px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-size: 13px;
+  background-color: var(--surface-secondary);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.filter-select:focus,
+.filter-input:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px var(--primary-blue-light);
+}
+
+.button-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-secondary {
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-secondary);
+  border-color: var(--primary-blue);
+}
+
+/* Role and Status Badges */
+.role-badge,
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.role-admin {
+  background: var(--color-error);
+  color: white;
+}
+
+.role-manager {
+  background: var(--color-warning);
+  color: white;
+}
+
+.role-warehouseman {
+  background: var(--primary-blue);
+  color: white;
+}
+
+.status-pending {
+  background: var(--color-warning);
+  color: white;
+}
+
+.status-approved {
+  background: var(--primary-blue);
+  color: white;
+}
+
+.status-completed {
+  background: var(--color-success);
+  color: white;
+}
+
+.status-rejected {
+  background: var(--color-error);
+  color: white;
+}
+
+/* Full Report Info */
+.full-report {
+  padding: 24px;
+  background: var(--surface-primary);
+  border-radius: 8px;
+  border-left: 4px solid var(--accent);
+}
+
+.info-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}

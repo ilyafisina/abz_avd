@@ -23,6 +23,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(window.innerWidth >= 768);
+  const [isDarkTheme, setIsDarkTheme] = React.useState(false);
   const [theme, setTheme] = React.useState<'light' | 'dark' | 'auto'>(() => {
     try {
       const t = localStorage.getItem('appTheme');
@@ -48,7 +49,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     let mq: MediaQueryList | null = null;
     try {
       const apply = (useDark: boolean) => {
-        if (useDark) document.documentElement.classList.add('theme-dark'); else document.documentElement.classList.remove('theme-dark');
+        if (useDark) {
+          document.documentElement.classList.add('theme-dark');
+          setIsDarkTheme(true);
+        } else {
+          document.documentElement.classList.remove('theme-dark');
+          setIsDarkTheme(false);
+        }
       };
 
       if (theme === 'auto') {
@@ -86,7 +93,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             >
               <FiMenu size={24} />
             </button>
-            <h2>АБЗ ВАД</h2>
+            <img 
+              src={isDarkTheme ? '/images/svet_temn.png' : '/images/temn_tem.png'} 
+              alt="Logo" 
+              className="navbar-logo"
+            />
           </div>
 
           <div className="navbar-user">
