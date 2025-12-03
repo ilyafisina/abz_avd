@@ -61,6 +61,11 @@ public class UsersController : ControllerBase
             return Unauthorized();
         }
 
+        // Обновляем статус online и время последнего посещения
+        user.IsOnline = true;
+        user.LastSeenAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
         await _auditService.LogActionAsync(
             "LOGIN",
             "User",
@@ -79,10 +84,13 @@ public class UsersController : ControllerBase
                 id = user.Id,
                 username = user.Username,
                 email = user.Email,
+                phone = user.Phone,
                 role = user.Role,
                 firstName = user.FirstName ?? user.Username,
                 lastName = user.LastName ?? "",
                 isActive = user.IsActive,
+                isOnline = user.IsOnline,
+                lastSeenAt = user.LastSeenAt,
                 createdAt = user.CreatedAt,
                 warehouseId = user.WarehouseId,
                 warehouse = user.Warehouse != null ? new { id = user.Warehouse.Id, name = user.Warehouse.Name } : null
@@ -93,11 +101,33 @@ public class UsersController : ControllerBase
 
     [HttpPost]
     [Authorize]
-    public async Task<ActionResult<User>> CreateUser(User user)
+    public async Task<ActionResult<object>> CreateUser(User user)
     {
+        // Проверяем валидность данных
+        if (string.IsNullOrWhiteSpace(user.Username) || string.IsNullOrWhiteSpace(user.Email))
+            return BadRequest(new { error = "Username и Email обязательны" });
+
+        // Проверяем уникальность username
+        var existingUsername = await _context.Users.FirstOrDefaultAsync(u => u.Username == user.Username);
+        if (existingUsername != null)
+            return BadRequest(new { error = "Пользователь с таким никнеймом уже существует" });
+
+        // Проверяем уникальность email
+        var existingEmail = await _context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
+        if (existingEmail != null)
+            return BadRequest(new { error = "Пользователь с таким email уже существует" });
+
+        // Проверяем уникальность phone если указан
+        if (!string.IsNullOrWhiteSpace(user.Phone))
+        {
+            var existingPhone = await _context.Users.FirstOrDefaultAsync(u => u.Phone == user.Phone);
+            if (existingPhone != null)
+                return BadRequest(new { error = "Пользователь с таким номером телефона уже существует" });
+        }
+
         user.PasswordHash = HashPassword(user.PasswordHash);
-        user.CreatedAt = DateTime.UtcNow;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.CreatedAt = DateTime.Now;
+        user.UpdatedAt = DateTime.Now;
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
         
@@ -121,64 +151,81 @@ public class UsersController : ControllerBase
     [Authorize]
     public async Task<IActionResult> UpdateUser(int id, User user)
     {
-        if (id != user.Id)
-            return BadRequest();
-
-        var existingUser = await _context.Users.FindAsync(id);
-        if (existingUser == null)
-            return NotFound();
-
-        var oldValues = new { existingUser.Username, existingUser.Email, existingUser.Role, existingUser.FirstName, existingUser.LastName };
-
-        existingUser.Username = user.Username;
-        existingUser.Email = user.Email;
-        existingUser.FirstName = user.FirstName;
-        existingUser.LastName = user.LastName;
-        existingUser.Role = user.Role;
-        existingUser.WarehouseId = user.WarehouseId;
-        existingUser.IsActive = user.IsActive;
-        existingUser.UpdatedAt = DateTime.UtcNow;
-
-        if (!string.IsNullOrEmpty(user.PasswordHash))
-        {
-            if (user.PasswordHash.Length < 40 || !IsValidBase64(user.PasswordHash))
-            {
-                existingUser.PasswordHash = HashPassword(user.PasswordHash);
-            }
-            else
-            {
-                existingUser.PasswordHash = user.PasswordHash;
-            }
-        }
-
-        _context.Entry(existingUser).State = EntityState.Modified;
         try
         {
+            if (id != user.Id)
+                return BadRequest(new { error = "ID не совпадает" });
+
+            var existingUser = await _context.Users.FindAsync(id);
+            if (existingUser == null)
+                return NotFound(new { error = "Пользователь не найден" });
+
+            // Проверяем уникальность username если изменился
+            if (existingUser.Username != user.Username)
+            {
+                var duplicateUsername = await _context.Users.FirstOrDefaultAsync(u => u.Username == user.Username);
+                if (duplicateUsername != null)
+                    return BadRequest(new { error = "Пользователь с таким никнеймом уже существует" });
+            }
+
+            // Проверяем уникальность email если изменился
+            if (existingUser.Email != user.Email)
+            {
+                var duplicateEmail = await _context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
+                if (duplicateEmail != null)
+                    return BadRequest(new { error = "Пользователь с таким email уже существует" });
+            }
+
+            // Проверяем уникальность phone если изменился и не пустой
+            if (!string.IsNullOrWhiteSpace(user.Phone) && existingUser.Phone != user.Phone)
+            {
+                var duplicatePhone = await _context.Users.FirstOrDefaultAsync(u => u.Phone == user.Phone);
+                if (duplicatePhone != null)
+                    return BadRequest(new { error = "Пользователь с таким номером телефона уже существует" });
+            }
+
+            existingUser.Username = user.Username;
+            existingUser.Email = user.Email;
+            existingUser.Phone = user.Phone;
+            existingUser.FirstName = user.FirstName;
+            existingUser.LastName = user.LastName;
+            existingUser.Role = user.Role;
+            existingUser.WarehouseId = user.WarehouseId;
+            existingUser.IsActive = user.IsActive;
+            existingUser.UpdatedAt = DateTime.Now;
+
+            if (!string.IsNullOrEmpty(user.PasswordHash))
+            {
+                if (user.PasswordHash.Length < 40 || !IsValidBase64(user.PasswordHash))
+                {
+                    existingUser.PasswordHash = HashPassword(user.PasswordHash);
+                }
+                else
+                {
+                    existingUser.PasswordHash = user.PasswordHash;
+                }
+            }
+
+            _context.Entry(existingUser).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            await _auditService.LogActionAsync(
+                "UPDATE",
+                "User",
+                id,
+                int.TryParse(userIdClaim, out var userId) ? userId : (int?)null,
+                existingUser.WarehouseId,
+                description: $"User {existingUser.Username} updated"
+            );
+
+            return NoContent();
         }
-        catch (DbUpdateConcurrencyException)
+        catch (Exception ex)
         {
-            if (!UserExists(id))
-                return NotFound();
-            throw;
+            Console.WriteLine($"UpdateUser error: {ex.Message}");
+            return BadRequest(new { error = ex.Message });
         }
-
-        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-        var userId = userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
-
-        var newValues = new { existingUser.Username, existingUser.Email, existingUser.Role, existingUser.FirstName, existingUser.LastName };
-        
-        await _auditService.LogActionAsync(
-            "UPDATE",
-            "User",
-            id,
-            userId,
-            existingUser.WarehouseId,
-            description: $"User {existingUser.Username} updated",
-            logLevel: "INFO"
-        );
-        
-        return NoContent();
     }
 
     [HttpDelete("{id}")]
@@ -253,6 +300,52 @@ public class UsersController : ControllerBase
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    [HttpPost("{id}/logout")]
+    [Authorize]
+    public async Task<ActionResult<object>> Logout(int id)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user == null)
+            return NotFound(new { error = "Пользователь не найден" });
+
+        user.IsOnline = false;
+        user.LastSeenAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        await _auditService.LogActionAsync(
+            "LOGOUT",
+            "User",
+            id,
+            id,
+            user.WarehouseId,
+            description: $"User {user.Username} logged out",
+            logLevel: "INFO",
+            ipAddress: ipAddress
+        );
+
+        return Ok(new { message = "Успешно вышли из системы" });
+    }
+
+    [HttpPost("{id}/update-last-seen")]
+    [Authorize]
+    public async Task<ActionResult<object>> UpdateLastSeen(int id)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user == null)
+            return NotFound(new { error = "Пользователь не найден" });
+
+        user.LastSeenAt = DateTime.UtcNow;
+        if (!user.IsOnline)
+        {
+            user.IsOnline = true;
+        }
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Статус обновлен", lastSeenAt = user.LastSeenAt, isOnline = user.IsOnline });
+    }
+
 }
 
 public class LoginRequest

@@ -27,12 +27,15 @@ public class User
     public int Id { get; set; }
     public string Username { get; set; } = null!;
     public string Email { get; set; } = null!;
+    public string? Phone { get; set; }
     public string PasswordHash { get; set; } = null!;
     public string Role { get; set; } = null!; // admin, manager, warehouseman
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
     public int? WarehouseId { get; set; } // FK to Warehouse.Id
     public bool IsActive { get; set; } = true;
+    public bool IsOnline { get; set; } = false;
+    public DateTime? LastSeenAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
