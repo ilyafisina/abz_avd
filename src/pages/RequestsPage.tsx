@@ -16,6 +16,7 @@ export const RequestsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [filterStatus, setFilterStatus] = useState<RequestStatus | 'all'>('all');
   const [filterType, setFilterType] = useState<RequestType | 'all'>('all');
+  const [filterWarehouse, setFilterWarehouse] = useState<number | 'all'>('all');
   const [sortBy, setSortBy] = useState('newest');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -95,7 +96,10 @@ export const RequestsPage = () => {
   const filteredRequests = requests.filter((r) => {
     const matchStatus = filterStatus === 'all' || r.status === filterStatus;
     const matchType = filterType === 'all' || r.requestType === filterType;
-    return matchStatus && matchType;
+    const matchWarehouse = isAdmin 
+      ? filterWarehouse === 'all' || r.warehouseId === filterWarehouse
+      : true;
+    return matchStatus && matchType && matchWarehouse;
   });
 
   filteredRequests.sort((a, b) => {
@@ -827,6 +831,20 @@ export const RequestsPage = () => {
       )}
 
       <div className="filters-bar">
+        {isAdmin && (
+          <select 
+            value={filterWarehouse} 
+            onChange={(e) => setFilterWarehouse(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+          >
+            <option value="all">Все площадки</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.name}
+              </option>
+            ))}
+          </select>
+        )}
+
         <select 
           value={filterStatus} 
           onChange={(e) => setFilterStatus(e.target.value as RequestStatus | 'all')}

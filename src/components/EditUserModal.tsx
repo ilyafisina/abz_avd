@@ -10,6 +10,7 @@ interface EditUserModalProps {
     username: string;
     password?: string;
     email: string;
+    phone?: string;
     firstName?: string;
     lastName?: string;
     role: 'admin' | 'manager' | 'warehouseman';
@@ -101,6 +102,18 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               value={formData.email}
               onChange={(e) => onFormChange('email', e.target.value)}
               placeholder="email@example.com"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="user-phone">Номер телефона</label>
+            <input
+              id="user-phone"
+              type="tel"
+              value={formData.phone || ''}
+              onChange={(e) => onFormChange('phone', e.target.value)}
+              placeholder="+7 (999) 999-99-99"
               disabled={isLoading}
             />
           </div>

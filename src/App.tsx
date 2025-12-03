@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
-import { useAuth } from './contexts/useAuth';
 import { ToastContainer } from './components/Toast';
 import { Layout } from './components/layout/Layout';
 import { Login } from './components/auth/Login';
@@ -21,8 +20,6 @@ import { HelpPage } from './pages/HelpPage';
 import './App.css';
 
 const DashboardRouter = () => {
-  const { user } = useAuth();
-
   return (
     <Layout>
       <Routes>

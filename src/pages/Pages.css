@@ -113,6 +113,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
 }
 
 .data-table thead {
@@ -120,18 +121,29 @@
 }
 
 .data-table th {
-  padding: 12px;
-  text-align: left;
+  padding: 12px 8px;
+  text-align: center;
   color: var(--text-primary);
   font-weight: 600;
   border-bottom: 1px solid var(--border-primary);
   white-space: nowrap;
+  word-break: break-word;
+}
+
+.data-table th:first-child {
+  text-align: left;
 }
 
 .data-table td {
-  padding: 12px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--border-secondary);
   color: var(--text-primary);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.data-table td:first-child {
+  text-align: left;
 }
 
 .data-table tbody tr:hover {
@@ -186,11 +198,19 @@
   font-size: 12px;
   font-weight: 500;
   color: var(--primary-blue);
+  text-align: center;
 }
 
 .data-table .actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.data-table td.actions {
+  padding: 8px 4px;
 }
 
 .products-list {
@@ -213,20 +233,35 @@
 }
 
 .products-list th {
-  padding: 14px;
-  text-align: left;
+  padding: 12px 8px;
+  text-align: center;
   color: var(--text-primary);
   font-weight: 600;
   border-bottom: 2px solid var(--border-primary);
   white-space: nowrap;
   position: sticky;
   top: 0;
+  word-break: break-word;
+}
+
+.products-list th:first-child {
+  text-align: left;
 }
 
 .products-list td {
-  padding: 14px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--border-primary);
   color: var(--text-primary);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.products-list td:first-child {
+  text-align: left;
+}
+
+.products-list td.actions {
+  padding: 8px 4px;
 }
 
 .products-list tbody tr {
@@ -298,13 +333,15 @@
 
 .btn-action {
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 11px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s ease;
   white-space: nowrap;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .btn-edit {

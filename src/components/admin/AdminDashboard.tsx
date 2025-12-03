@@ -140,7 +140,7 @@ const UsersTab: React.FC<{ users: User[] }> = ({ users }) => {
                     {user.isActive ? 'Активен' : 'Неактивен'}
                   </span>
                 </td>
-                <td>{formatDate(user.createdAt)}</td>
+                <td>{user.createdAt ? formatDate(user.createdAt) : '—'}</td>
                 <td className="actions">
                   <button className="btn-action edit">✏️</button>
                   <button className="btn-action delete">🗑️</button>

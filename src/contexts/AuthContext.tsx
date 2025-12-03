@@ -18,6 +18,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const expiresAt = new Date(parsedSession.expiresAt);
           
           if (expiresAt > new Date()) {
+            // Восстанавливаем сессию и token
+            apiService.setToken(parsedSession.token);
             setSession(parsedSession);
             setUser(parsedSession.user);
           } else {
@@ -45,12 +47,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     try {
+      // Обновляем статус online перед выходом
+      if (user?.id) {
+        await apiService.logoutUser(user.id);
+      }
       await apiService.logout();
       setUser(null);
       setSession(null);
       localStorage.removeItem('authSession');
     } catch (error) {
       console.error('Ошибка при выходе:', error);
+      // Всё равно выходим, даже если ошибка
+      setUser(null);
+      setSession(null);
+      localStorage.removeItem('authSession');
     }
   };
 
@@ -66,6 +76,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log('Регистрация:', { username, email, password, role, firstName, lastName });
   };
 
+  const refreshUser = async () => {
+    if (user?.id) {
+      try {
+        const updatedUser = await apiService.getUser(user.id);
+        if (updatedUser) {
+          setUser(updatedUser);
+          // Обновляем и в сессии
+          if (session) {
+            const updatedSession = { ...session, user: updatedUser };
+            setSession(updatedSession);
+            localStorage.setItem('authSession', JSON.stringify(updatedSession));
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка при обновлении пользователя:', error);
+      }
+    }
+  };
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
@@ -74,6 +103,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     logout,
     register,
     session,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

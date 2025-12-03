@@ -310,7 +310,7 @@ public class UsersController : ControllerBase
             return NotFound(new { error = "Пользователь не найден" });
 
         user.IsOnline = false;
-        user.LastSeenAt = DateTime.UtcNow;
+        user.LastSeenAt = DateTime.Now;
         await _context.SaveChangesAsync();
 
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -336,7 +336,7 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound(new { error = "Пользователь не найден" });
 
-        user.LastSeenAt = DateTime.UtcNow;
+        user.LastSeenAt = DateTime.Now;
         if (!user.IsOnline)
         {
             user.IsOnline = true;

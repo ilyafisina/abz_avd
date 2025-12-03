@@ -486,7 +486,7 @@ class ApiService {
 
   async updateRequest(id: string, request: Partial<Request>): Promise<Request | undefined> {
     // Обновляем основные поля Request
-    const data = await this.fetchApi<any>(`/requests/${id}`, {
+    await this.fetchApi<any>(`/requests/${id}`, {
       method: 'PUT',
       body: JSON.stringify({
         id: parseInt(id),
@@ -667,6 +667,7 @@ class ApiService {
     username: string;
     password: string;
     email?: string;
+    phone?: string;
     firstName?: string;
     lastName?: string;
     role: 'admin' | 'manager' | 'warehouseman';
@@ -677,6 +678,7 @@ class ApiService {
         username: userData.username,
         passwordHash: userData.password, // Backend ожидает passwordHash
         email: userData.email || 'user@warehouse.local',
+        phone: userData.phone || '',
         firstName: userData.firstName || userData.username,
         lastName: userData.lastName || '',
         role: userData.role,
@@ -695,6 +697,7 @@ class ApiService {
         id: String(data.id),
         username: data.username,
         email: data.email,
+        phone: data.phone || '',
         role: data.role as UserRole,
         firstName: data.firstName || data.username,
         lastName: data.lastName || '',
@@ -722,6 +725,7 @@ class ApiService {
           id: String(updates.id || id),
           username: updates.username || '',
           email: updates.email || '',
+          phone: updates.phone || '',
           passwordHash: updates.passwordHash,
           role: (updates.role as UserRole) || 'warehouseman',
           firstName: updates.firstName || '',
@@ -737,6 +741,7 @@ class ApiService {
         id: String(data.id),
         username: data.username,
         email: data.email,
+        phone: data.phone || '',
         passwordHash: data.passwordHash,
         role: data.role as UserRole,
         firstName: data.firstName || data.username,
@@ -767,6 +772,69 @@ class ApiService {
   async getLogs(): Promise<SystemLog[]> {
     // Для логов используем mock данные, так как это админ функция
     return [];
+  }
+
+  // ==================== USER STATUS ====================
+
+  async updateLastSeen(userId: string): Promise<{ lastSeenAt: Date; isOnline: boolean } | undefined> {
+    try {
+      const data = await this.fetchApi<any>(`/users/${userId}/update-last-seen`, {
+        method: 'POST',
+      });
+
+      if (!data) return undefined;
+
+      return {
+        lastSeenAt: new Date(data.lastSeenAt),
+        isOnline: data.isOnline,
+      };
+    } catch (error) {
+      console.error('Ошибка при обновлении времени посещения:', error);
+      return undefined;
+    }
+  }
+
+  async logoutUser(userId: string): Promise<boolean> {
+    try {
+      await this.fetchApi<any>(`/users/${userId}/logout`, {
+        method: 'POST',
+      });
+      return true;
+    } catch (error) {
+      console.error('Ошибка при выходе:', error);
+      return true; // Всё равно продолжаем выход
+    }
+  }
+
+  async getUser(userId: string): Promise<User | undefined> {
+    try {
+      const data = await this.fetchApi<any>(`/users/${userId}`, {
+        method: 'GET',
+      });
+
+      if (!data) return undefined;
+
+      return {
+        id: data.id.toString(),
+        username: data.username,
+        email: data.email,
+        phone: data.phone,
+        passwordHash: data.passwordHash,
+        role: data.role,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        warehouseId: data.warehouseId,
+        isActive: data.isActive,
+        isOnline: data.isOnline,
+        lastSeenAt: data.lastSeenAt ? new Date(data.lastSeenAt) : undefined,
+        createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
+        updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined,
+        warehouse: data.warehouse,
+      };
+    } catch (error) {
+      console.error('Ошибка при получении пользователя:', error);
+      return undefined;
+    }
   }
 }
 

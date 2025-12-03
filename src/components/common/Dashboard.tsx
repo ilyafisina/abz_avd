@@ -6,7 +6,6 @@ import {
   FiDollarSign,
   FiUsers,
   FiBarChart2,
-  FiDownload,
 } from 'react-icons/fi';
 import { useAuth } from '../../contexts/useAuth';
 import { apiService } from '../../services/apiService';
@@ -109,11 +108,6 @@ export const Dashboard: React.FC = () => {
       admin: '⚙️ Панель Администратора',
     };
     return roleLabels[user?.role || ''] || 'Панель управления';
-  };
-
-  const getWarehouseLabel = () => {
-    if (selectedWarehouse === 'all') return 'Все склады';
-    return warehouses.find(w => w.id === selectedWarehouse)?.name || 'Неизвестный склад';
   };
 
   return (
@@ -424,18 +418,18 @@ interface QuickActionsSectionProps {
 const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({ role }) => {
   const actions = {
     warehouseman: [
-      { label: 'Товары', href: '/products',  },
-      { label: 'Заявки', href: '/requests',  },
+      { label: 'Товары', href: '/products' },
+      { label: 'Заявки', href: '/requests' },
     ],
     manager: [
-      { label: 'Новая заявка', href: '/requests',  },
-      { label: 'Отчеты', href: '/reports',  },
-      { label: 'Местоположения', href: '/locations',  },
+      { label: 'Новая заявка', href: '/requests' },
+      { label: 'Отчеты', href: '/reports' },
+      { label: 'Местоположения', href: '/locations' },
     ],
     admin: [
-      { label: 'Пользователи', href: '/users',  },
-      { label: 'Логи системы', href: '/logs',  },
-      { label: 'Отчеты', href: '/reports',  },
+      { label: 'Пользователи', href: '/users' },
+      { label: 'Логи системы', href: '/logs' },
+      { label: 'Отчеты', href: '/reports' },
     ],
   };
 
@@ -449,7 +443,6 @@ const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({ role }) => {
       <div className="quick-actions">
         {roleActions.map((action, idx) => (
           <a key={idx} href={action.href} className="quick-action-btn">
-            <span className="icon">{action.icon}</span>
             <span className="label">{action.label}</span>
           </a>
         ))}

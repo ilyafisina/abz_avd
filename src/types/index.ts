@@ -21,14 +21,18 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  phone?: string;
   passwordHash?: string;
   role: UserRole;
   firstName?: string;
   lastName?: string;
   isActive: boolean;
+  isOnline?: boolean;
+  lastSeenAt?: Date;
   warehouseId?: number; // ID площадки для менеджера и складовщика
   warehouse?: Warehouse; // навигационное свойство
-  createdAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
   warehouseArea?: string; // для складовщиков - зона в складе
 }
 

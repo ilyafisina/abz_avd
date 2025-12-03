@@ -30,9 +30,9 @@ export const PrintProductsPage = () => {
       const data = await apiService.getProducts();
       
       let filtered = data;
-      if (user && user.role !== 'admin' && user.warehouse) {
-        filtered = data.filter((p) => p.warehouse === user.warehouse);
-        const warehouse = await apiService.getWarehouseById(user.warehouse);
+      if (user && user.role !== 'admin' && user.warehouseId) {
+        filtered = data.filter((p) => p.warehouseId === user.warehouseId);
+        const warehouse = await apiService.getWarehouseById(String(user.warehouseId));
         setUserWarehouse(warehouse || null);
       }
       

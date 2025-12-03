@@ -502,21 +502,23 @@ export const ProductsPage = () => {
                         {isLowStock ? 'Низкий' : 'ОК'}
                       </span>
                     </td>
-                    {isAdmin && <td className="warehouse">{warehouseName}</td>}
-                    <td style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {isAdmin && (
+                      <td className="warehouse">{warehouseName}</td>
+                    )}
+                    <td className="actions">
                       <button
                         onClick={() => handleEdit(product)}
                         className="btn-action btn-edit"
                         title="Редактировать товар"
                       >
-                        ✏️ Редакт.
+                        Редакт.
                       </button>
                       <button
                         onClick={() => handleDelete(product.id)}
                         className="btn-action btn-delete"
                         title="Удалить товар"
                       >
-                        🗑️ Удал.
+                        Удал.
                       </button>
                     </td>
                   </tr>
