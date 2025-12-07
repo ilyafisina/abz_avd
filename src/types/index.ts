@@ -12,7 +12,7 @@ export interface Category {
 
 // Типы запросов
 export type RequestType = 'incoming' | 'writeoff' | 'transfer' | 'adjustment';
-export type RequestStatus = 'pending' | 'approved' | 'in_transit' | 'rejected' | 'completed';
+export type RequestStatus = 'черновик' | 'на_согласовании' | 'одобрено' | 'в_пути' | 'на_приемке' | 'завершено' | 'отменено';
 export type Priority = 'low' | 'normal' | 'high';
 export type EntityType = 'product' | 'request' | 'user' | 'warehouse' | 'other';
 
@@ -81,6 +81,13 @@ export interface Request {
   approvedAt?: Date;
   completedBy?: string;
   completedAt?: Date;
+  completedByUser?: User;
+  receivedBy?: string;
+  receivedAt?: Date;
+  receivedByUser?: User;
+  cancelledBy?: string;
+  cancelledAt?: Date;
+  cancelledByUser?: User;
   notes?: string;
   priority?: Priority;
 }
@@ -167,11 +174,19 @@ export interface Transfer {
   status?: RequestStatus;
   products?: RequestProduct[];
   createdBy?: string | number;
+  createdAt?: Date | string;
   createdByUser?: User;
   approvedBy?: string | number;
+  approvedAt?: Date | string;
   approvedByUser?: User;
   completedBy?: string | number;
   completedByUser?: User;
+  receivedBy?: string | number;
+  receivedAt?: Date | string;
+  receivedByUser?: User;
+  cancelledBy?: string | number;
+  cancelledAt?: Date | string;
+  cancelledByUser?: User;
   [key: string]: unknown;
 }
 
