@@ -366,7 +366,7 @@ class ApiService {
       const products = (r.requestProducts || []).map((rp: any) => ({
         productId: String(rp.productId),
         productName: rp.product?.name || `Product ${rp.productId}`,
-        quantity: rp.quantity,
+        quantity: rp.reservedQuantity || rp.quantity,
         location: rp.product?.location || undefined,
       }));
 
@@ -384,6 +384,13 @@ class ApiService {
         approvedAt: r.approvedAt ? new Date(r.approvedAt) : undefined,
         completedBy: r.completedBy ? String(r.completedBy) : undefined,
         completedAt: r.completedAt ? new Date(r.completedAt) : undefined,
+        completedByUser: r.completedByUser,
+        receivedBy: r.receivedBy ? String(r.receivedBy) : undefined,
+        receivedAt: r.receivedAt ? new Date(r.receivedAt) : undefined,
+        receivedByUser: r.receivedByUser,
+        cancelledBy: r.cancelledBy ? String(r.cancelledBy) : undefined,
+        cancelledAt: r.cancelledAt ? new Date(r.cancelledAt) : undefined,
+        cancelledByUser: r.cancelledByUser,
         priority: 'normal',
         notes: r.notes,
       };
@@ -402,7 +409,7 @@ class ApiService {
       const products = (data.requestProducts || []).map((rp: any) => ({
         productId: String(rp.productId),
         productName: rp.product?.name || `Product ${rp.productId}`,
-        quantity: rp.quantity,
+        quantity: rp.reservedQuantity || rp.quantity,
         location: rp.product?.location || undefined,
       }));
 
@@ -422,6 +429,13 @@ class ApiService {
         approvedAt: data.approvedAt ? new Date(data.approvedAt) : undefined,
         completedBy: data.completedBy ? String(data.completedBy) : undefined,
         completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
+        completedByUser: data.completedByUser,
+        receivedBy: data.receivedBy ? String(data.receivedBy) : undefined,
+        receivedAt: data.receivedAt ? new Date(data.receivedAt) : undefined,
+        receivedByUser: data.receivedByUser,
+        cancelledBy: data.cancelledBy ? String(data.cancelledBy) : undefined,
+        cancelledAt: data.cancelledAt ? new Date(data.cancelledAt) : undefined,
+        cancelledByUser: data.cancelledByUser,
         priority: 'normal',
         notes: data.notes,
       };
@@ -457,7 +471,7 @@ class ApiService {
           method: 'POST',
           body: JSON.stringify({
             productId: parseInt(String(product.productId)),
-            quantity: product.quantity,
+            reservedQuantity: product.quantity,
           }),
         });
       }
@@ -834,6 +848,17 @@ class ApiService {
     } catch (error) {
       console.error('Ошибка при получении пользователя:', error);
       return undefined;
+    }
+  }
+
+  async getReservedProducts(): Promise<any[]> {
+    try {
+      return await this.fetchApi<any[]>('/requests/reserved-products', {
+        method: 'GET',
+      });
+    } catch (error) {
+      console.error('Ошибка при получении резервированных товаров:', error);
+      return [];
     }
   }
 }
