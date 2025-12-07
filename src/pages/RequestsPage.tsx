@@ -131,7 +131,7 @@ export const RequestsPage = () => {
       // Создание новой заявки на бэкенде
       await apiService.createRequest({
         requestType: formData.requestType,
-        status: 'pending',
+        status: 'черновик',
         warehouseId: formData.fromWarehouseId || user.warehouseId || 1,
         transferWarehouseId: formData.toWarehouseId,
         products: formData.products,
@@ -167,7 +167,7 @@ export const RequestsPage = () => {
         products: editFormData.products,
         notes: editFormData.notes,
         priority: editFormData.priority,
-        status: 'pending',
+        status: 'черновик',
       });
 
       // Перезагружаем список заявок с бэкенда
@@ -215,105 +215,198 @@ export const RequestsPage = () => {
       totalQuantity += product.quantity;
     });
 
-    // Создаём HTML для PDF
+    // Получаем полный номер документа (REQ-9)
+    const docNumber = request.requestNumber;
+    const barcodeNumber = request.requestNumber.replace('REQ-', '');
+
+    // Функция для генерации штрихкода (Code128)
+    const generateBarcode = (value: string) => {
+      const codes: { [key: string]: string } = {
+        '0': '11011001100', '1': '11100110100', '2': '11100100110', '3': '11100100011',
+        '4': '11101100100', '5': '11101001100', '6': '11101001010', '7': '11100101100',
+        '8': '11100101001', '9': '11101010100', '-': '11101010001', '.': '11101001001',
+        ' ': '11001101100', '*': '11001110010', '+': '11010001100', '/': '11010010100',
+        ':': '11010010010', ';': '11010100100', '<': '11010100010', '=': '11010010001',
+        '>': '11010001010', '?': '11010001001', '@': '11010100101'
+      };
+      
+      // Упрощённая генерация - используем значения как палочки
+      let barcode = '';
+      for (let i = 0; i < value.length; i++) {
+        const char = value[i];
+        if (codes[char]) {
+          barcode += codes[char].split('').map(bit => bit === '1' ? '█' : ' ').join('');
+        } else {
+          barcode += '█ ';
+        }
+      }
+      return barcode;
+    };
+
+    const barcode = generateBarcode(docNumber);
+
+    // Определяем роль создателя (отпустил)
+    const releasedByRole = request.createdByUser?.role === 'admin' ? 'Заведующий' : request.createdByUser?.role === 'manager' ? 'Менеджер склада' : 'Кладовщик';
+    
+    // Определяем роль одобрившего
+    const approvedByRole = request.approvedByUser?.role === 'admin' ? 'Начальник' : 'Менеджер';
+
+    // Создаём HTML для PDF согласно форме ТОРГ-13
     const htmlContent = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; color: #000;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="margin: 0; font-size: 18px;">ООО "ЛОГИСТИЧЕСКИЙ ЦЕНТР"</h2>
-          <p style="margin: 5px 0; font-size: 12px;">АД: г. Москва, ул. Логистическая, д. 1</p>
-          <p style="margin: 5px 0; font-size: 12px;">Тел: +7 (495) 123-45-67 | Email: info@logistics.ru</p>
-          <hr style="border: none; border-top: 1px solid #000; margin: 10px 0;" />
-          <h1 style="margin: 10px 0; font-size: 16px;">ТОВАРОТРАНСПОРТНАЯ НАКЛАДНАЯ (ТТН)</h1>
+      <div style="font-family: 'Times New Roman', serif; padding: 20px; line-height: 1.3; color: #000; font-size: 10px; position: relative;">
+        
+        <!-- Штрихкод в верхнем левом углу -->
+        <div style="position: absolute; top: 15px; left: 15px; text-align: center;">
+          <div style="font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 1px; font-weight: bold; line-height: 1; margin-bottom: 2px;">
+            ${barcode}
+          </div>
+          <div style="font-size: 8px; font-weight: bold; margin-top: 2px;">${docNumber}</div>
         </div>
 
-        <div style="margin-bottom: 15px;">
-          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">ДАННЫЕ ДОКУМЕНТА</h3>
-          <table style="width: 100%; font-size: 11px;">
+        <!-- Реквизиты в верхнем правом углу -->
+        <div style="position: absolute; top: 15px; right: 15px; text-align: right; font-size: 8px; line-height: 1.5;">
+          <div><strong>Форма по ОКУД:</strong> 0330213</div>
+          <div><strong>Код по ОКПО:</strong> 00001000</div>
+          <div><strong>Вид деятельности:</strong> 46</div>
+          <div><strong>Вид операции:</strong> 11</div>
+        </div>
+
+        <div style="margin-top: 60px; margin-bottom: 15px; text-align: center;">
+          <h3 style="margin: 0; font-size: 12px; font-weight: bold;">Унифицированная форма № ТОРГ-13</h3>
+          <p style="margin: 2px 0; font-size: 8px;">Утверждена постановлением Госкомстата России от 25.12.98 № 132</p>
+        </div>
+
+        <div style="margin-bottom: 10px; border: 1px solid #000; padding: 8px;">
+          <p style="margin: 0; font-weight: bold; font-size: 10px;">ОРГАНИЗАЦИЯ</p>
+          <p style="margin: 2px 0; font-size: 9px;">
+            <strong>ООО "АБЗ-ВАД"</strong><br/>
+            Автомеханический завод по производству запасных частей<br/>
+            ИНН 7701234567, КПП 770101001<br/>
+            г. Москва, ул. Автозаводская, д. 23, тел.: (495) 123-45-67
+          </p>
+        </div>
+
+        <div style="margin-bottom: 10px; border: 1px solid #000; padding: 8px;">
+          <table style="width: 100%; font-size: 9px;">
             <tr>
-              <td style="width: 50%;">Номер ТТН: ${request.requestNumber}</td>
-              <td>Дата: ${new Date(request.createdAt).toLocaleDateString('ru-RU')}</td>
+              <td style="width: 50%; padding-right: 8px;">
+                <strong>Номер документа:</strong> ${docNumber}
+              </td>
+              <td style="width: 50%; padding-left: 8px;">
+                <strong>Дата составления:</strong> ${new Date(request.createdAt).toLocaleDateString('ru-RU')}
+              </td>
             </tr>
-            <tr>
-              <td>Тип операции: ${getTypeLabel(request.requestType)}</td>
-              <td>Статус: ${getStatusLabel(request.status)}</td>
+            <tr style="border-top: 1px solid #000;">
+              <td colspan="2" style="padding-top: 5px; text-align: center; font-weight: bold;">
+                НАКЛАДНАЯ на внутреннее перемещение, передачу товаров, тары
+              </td>
             </tr>
           </table>
         </div>
 
-        <div style="margin-bottom: 15px;">
-          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">СТОРОНЫ ТРАНСПОРТИРОВКИ</h3>
-          <table style="width: 100%; font-size: 11px;">
+        <!-- Стороны транспортировки -->
+        <div style="margin-bottom: 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
             <tr>
-              <td style="width: 50%; padding: 5px; border: 1px solid #000; vertical-align: top;">
-                <strong>От (отправитель):</strong><br/>
-                ${fromWarehouse?.name || 'Неизвестно'}<br/>
-                <strong>Адрес:</strong> ${fromWarehouse?.location || 'Не указан'}
+              <td style="width: 33%; border: 1px solid #000; padding: 6px; vertical-align: top;">
+                <strong>Отправитель</strong><br/>
+                <strong>структурное подразделение:</strong><br/>${fromWarehouse?.name || 'Не указано'}<br/>
+                <strong>вид деятельности:</strong> 46
               </td>
-              <td style="width: 50%; padding: 5px; border: 1px solid #000; vertical-align: top;">
-                <strong>Кому (получатель):</strong><br/>
-                ${toWarehouse?.name || 'Не указано'}<br/>
-                <strong>Адрес:</strong> ${toWarehouse?.location || 'Не указан'}
+              <td style="width: 33%; border: 1px solid #000; padding: 6px; vertical-align: top;">
+                <strong>Получатель</strong><br/>
+                <strong>структурное подразделение:</strong><br/>${toWarehouse?.name || 'Не указано'}<br/>
+                <strong>вид деятельности:</strong> 46
+              </td>
+              <td style="width: 34%; border: 1px solid #000; padding: 6px; vertical-align: top;">
+                <strong>Корреспондирующий счет</strong><br/>
+                <strong>счет, субсчет:</strong> 10-01<br/>
+                <strong>код аналитического учета:</strong> 001
               </td>
             </tr>
           </table>
         </div>
 
-        <div style="margin-bottom: 15px;">
-          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">СПИСОК ТОВАРОВ</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+        <!-- Таблица товаров -->
+        <div style="margin-bottom: 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 8px;">
             <thead>
-              <tr style="background-color: #f0f0f0;">
-                <th style="border: 1px solid #000; padding: 5px; text-align: left;">№</th>
-                <th style="border: 1px solid #000; padding: 5px; text-align: left;">Наименование товара</th>
-                <th style="border: 1px solid #000; padding: 5px; text-align: center;">Кол-во</th>
-                <th style="border: 1px solid #000; padding: 5px; text-align: left;">Место хранения</th>
+              <tr style="border: 1px solid #000; background-color: #f8f8f8;">
+                <th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">Товар, тара</th>
+                <th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">Единица измерения</th>
+                <th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">Отпущено</th>
+              </tr>
+              <tr style="border: 1px solid #000; background-color: #f8f8f8;">
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">наименование</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">код</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">в одном месте</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">мест, штук</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">брутто</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">нетто</td>
               </tr>
             </thead>
             <tbody>
-              ${request.products.map((product, idx) => `
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;">${idx + 1}</td>
-                  <td style="border: 1px solid #000; padding: 5px;">${product.productName}</td>
-                  <td style="border: 1px solid #000; padding: 5px; text-align: center;">${product.quantity}</td>
-                  <td style="border: 1px solid #000; padding: 5px;">${product.location || '-'}</td>
+              ${request.products.map((product) => `
+                <tr style="border: 1px solid #000;">
+                  <td style="border: 1px solid #000; padding: 3px;">${product.productName}</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">шт</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">1</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">1</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">${product.quantity}</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">${product.quantity}</td>
                 </tr>
               `).join('')}
-              <tr style="font-weight: bold;">
-                <td colspan="2" style="border: 1px solid #000; padding: 5px; text-align: right;">ИТОГО:</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${totalQuantity}</td>
-                <td style="border: 1px solid #000; padding: 5px;">Товаров: ${request.products.length}</td>
+              <tr style="border: 1px solid #000; font-weight: bold; background-color: #f8f8f8;">
+                <td colspan="2" style="border: 1px solid #000; padding: 3px; text-align: right;">Итого</td>
+                <td style="border: 1px solid #000; padding: 3px; text-align: center;">1</td>
+                <td style="border: 1px solid #000; padding: 3px; text-align: center;">${request.products.length}</td>
+                <td style="border: 1px solid #000; padding: 3px; text-align: center;">${totalQuantity}</td>
+                <td style="border: 1px solid #000; padding: 3px;"></td>
+              </tr>
+              <tr style="border: 1px solid #000;">
+                <td colspan="6" style="border: 1px solid #000; padding: 3px;"><strong>Всего по накладной</strong></td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        ${request.notes ? `
-          <div style="margin-bottom: 15px;">
-            <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">ПРИМЕЧАНИЯ</h3>
-            <p style="margin: 5px 0; font-size: 11px; padding: 10px; border: 1px solid #000; background-color: #fafafa;">
-              ${request.notes}
-            </p>
-          </div>
-        ` : ''}
-
-        <div style="margin-top: 30px; display: flex; justify-content: space-between;">
-          <div style="text-align: center; flex: 1;">
-            <div style="height: 40px; border-top: 1px solid #000;"></div>
-            <p style="margin: 3px 0; font-size: 10px;">Подпись отправителя</p>
-          </div>
-          <div style="text-align: center; flex: 1;">
-            <div style="height: 40px; border-top: 1px solid #000;"></div>
-            <p style="margin: 3px 0; font-size: 10px;">Подпись менеджера</p>
-          </div>
-          <div style="text-align: center; flex: 1;">
-            <div style="height: 40px; border-top: 1px solid #000;"></div>
-            <p style="margin: 3px 0; font-size: 10px;">Подпись получателя</p>
-          </div>
+        <!-- Подписи -->
+        <div style="margin-top: 15px;">
+          <table style="width: 100%; font-size: 9px; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #000;">
+              <td style="width: 50%; padding: 8px; text-align: center; vertical-align: top;">
+                <strong>Отпустил ${releasedByRole}</strong><br/>
+                <span style="font-size: 8px;">${request.createdByUser?.firstName} ${request.createdByUser?.lastName}</span><br/>
+                <div style="height: 30px; margin: 5px 0;"></div>
+                <div style="border-top: 1px solid #000; font-size: 8px;">подпись</div>
+              </td>
+              <td style="width: 50%; padding: 8px; text-align: center; vertical-align: top;">
+                <strong>Одобрил ${approvedByRole}</strong><br/>
+                <span style="font-size: 8px;">${request.approvedByUser?.firstName} ${request.approvedByUser?.lastName}</span><br/>
+                <div style="height: 30px; margin: 5px 0;"></div>
+                <div style="border-top: 1px solid #000; font-size: 8px;">подпись</div>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #000;">
+              <td style="width: 50%; padding: 8px; text-align: center; vertical-align: top;">
+                <strong>Сумма словами:</strong><br/>
+                <span style="font-size: 8px;">По учёту</span>
+              </td>
+              <td style="width: 50%; padding: 8px; text-align: center; vertical-align: top;">
+                <strong>Принял Кладовщик</strong><br/>
+                <span style="font-size: 8px;">${request.receivedByUser?.firstName} ${request.receivedByUser?.lastName}</span><br/>
+                <div style="height: 30px; margin: 5px 0;"></div>
+                <div style="border-top: 1px solid #000; font-size: 8px;">подпись</div>
+              </td>
+            </tr>
+          </table>
         </div>
 
-        <div style="margin-top: 20px; text-align: center; font-size: 9px; color: #666;">
-          <p style="margin: 0;">Документ создан: ${new Date().toLocaleString('ru-RU')}</p>
+        <div style="margin-top: 15px; font-size: 8px; text-align: center; color: #333; border-top: 1px solid #000; padding-top: 8px;">
+          <p style="margin: 2px 0;">Статус: <strong>${getStatusLabel(request.status)}</strong></p>
+          <p style="margin: 2px 0;">Создано: ${new Date(request.createdAt).toLocaleString('ru-RU')}</p>
         </div>
+
       </div>
     `;
 
@@ -324,6 +417,8 @@ export const RequestsPage = () => {
     element.style.left = '-9999px';
     element.style.width = '210mm';
     element.style.background = 'white';
+    element.style.padding = '0';
+    element.style.margin = '0';
     document.body.appendChild(element);
 
     try {
@@ -345,25 +440,25 @@ export const RequestsPage = () => {
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth - 10;
+      const imgWidth = pdfWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       let heightLeft = imgHeight;
-      let position = 5;
+      let position = 0;
 
       // Добавляем изображение на первую страницу
-      pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight - 10;
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
 
       // Добавляем дополнительные страницы если нужно
       while (heightLeft >= 0) {
-        position = heightLeft - imgHeight + 5;
+        position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
       }
 
-      pdf.save(`TTN-${request.requestNumber}.pdf`);
+      pdf.save(`TTN-${docNumber}.pdf`);
     } finally {
       document.body.removeChild(element);
     }
@@ -393,35 +488,11 @@ export const RequestsPage = () => {
     }
   };
 
-  const canApproveRequest = (request: Request): boolean => {
-    if (isAdmin) return request.status === 'pending';
-    if (user?.role === 'manager' && request.warehouseId === user?.warehouseId) {
-      return request.status === 'pending';
-    }
-    return false;
-  };
-
-  const canCompleteRequest = (request: Request): boolean => {
-    if (isAdmin) return request.status === 'in_transit' || request.status === 'approved';
-    if (user?.role === 'manager' && request.transferWarehouseId === user?.warehouseId) {
-      return request.status === 'in_transit';
-    }
-    return false;
-  };
-
-  const canRejectRequest = (request: Request): boolean => {
-    if (isAdmin) return request.status === 'pending' || request.status === 'approved';
-    if (user?.role === 'manager' && request.warehouseId === user?.warehouseId) {
-      return request.status === 'pending';
-    }
-    return false;
-  };
-
   const getActionButtons = (request: Request) => {
     const buttons = [];
 
-    if (request.status === 'pending') {
-      // Кнопка редактирования доступна при статусе "Ожидание"
+    // ЧЕРНОВИК - можно редактировать и отправить на согласование
+    if (request.status === 'черновик') {
       if (isAdmin || (user?.role === 'manager' && request.warehouseId === user?.warehouseId)) {
         buttons.push(
           <button
@@ -446,24 +517,47 @@ export const RequestsPage = () => {
             ✎ Редактировать
           </button>
         );
+        buttons.push(
+          <button
+            key="send-review"
+            onClick={() => handleStatusChange(request, 'на_согласовании')}
+            className="btn-approve"
+            title="Отправить на согласование"
+          >
+            → На согласование
+          </button>
+        );
       }
-      if (canApproveRequest(request)) {
+      if (isAdmin || (user?.role === 'warehouseman' && request.warehouseId === user?.warehouseId)) {
+        buttons.push(
+          <button
+            key="cancel-draft"
+            onClick={() => handleStatusChange(request, 'отменено')}
+            className="btn-reject"
+            title="Отменить заявку"
+          >
+            ✗ Отменить
+          </button>
+        );
+      }
+    }
+    // НА СОГЛАСОВАНИИ - менеджер может одобрить или отменить
+    else if (request.status === 'на_согласовании') {
+      if (isAdmin || (user?.role === 'manager' && request.warehouseId === user?.warehouseId)) {
         buttons.push(
           <button
             key="approve"
-            onClick={() => handleStatusChange(request, 'approved')}
+            onClick={() => handleStatusChange(request, 'одобрено')}
             className="btn-approve"
             title="Одобрить заявку"
           >
             ✓ Одобрить
           </button>
         );
-      }
-      if (canRejectRequest(request)) {
         buttons.push(
           <button
-            key="reject"
-            onClick={() => handleStatusChange(request, 'rejected')}
+            key="reject-review"
+            onClick={() => handleStatusChange(request, 'отменено')}
             className="btn-reject"
             title="Отклонить заявку"
           >
@@ -471,56 +565,94 @@ export const RequestsPage = () => {
           </button>
         );
       }
-    } else if (request.status === 'approved') {
-      // Кнопка возврата в ожидание для редактирования
+    }
+    // ОДОБРЕНО - менеджер отправляет в пути
+    else if (request.status === 'одобрено') {
       if (isAdmin || (user?.role === 'manager' && request.warehouseId === user?.warehouseId)) {
         buttons.push(
           <button
-            key="edit-pending"
-            onClick={() => handleStatusChange(request, 'pending')}
-            className="btn-secondary"
-            title="Вернуть в ожидание для редактирования"
-          >
-            ↶ На редакцию
-          </button>
-        );
-        buttons.push(
-          <button
-            key="intransit"
-            onClick={() => handleStatusChange(request, 'in_transit')}
+            key="send-transit"
+            onClick={() => handleStatusChange(request, 'в_пути')}
             className="btn-inprogress"
-            title="Товар в пути"
+            title="Отправить товар в пути"
           >
             → В пути
           </button>
         );
+        buttons.push(
+          <button
+            key="cancel-approved"
+            onClick={() => handleStatusChange(request, 'отменено')}
+            className="btn-reject"
+            title="Отменить заявку"
+          >
+            ✗ Отменить
+          </button>
+        );
       }
-    } else if (request.status === 'in_transit') {
-      if (canCompleteRequest(request)) {
+    }
+    // В ПУТИ - площадка получения может принять товар
+    else if (request.status === 'в_пути') {
+      if (isAdmin || (user?.role === 'manager' && request.transferWarehouseId === user?.warehouseId) || 
+          (user?.role === 'warehouseman' && request.transferWarehouseId === user?.warehouseId)) {
+        buttons.push(
+          <button
+            key="receive"
+            onClick={() => handleStatusChange(request, 'на_приемке')}
+            className="btn-inprogress"
+            title="Товары поступили на приемку"
+          >
+            ↓ На приемку
+          </button>
+        );
+      }
+      if (isAdmin || (user?.role === 'manager' && request.warehouseId === user?.warehouseId) ||
+          (user?.role === 'warehouseman' && request.warehouseId === user?.warehouseId)) {
+        buttons.push(
+          <button
+            key="cancel-transit"
+            onClick={() => handleStatusChange(request, 'отменено')}
+            className="btn-reject"
+            title="Отменить доставку"
+          >
+            ✗ Отменить
+          </button>
+        );
+      }
+    }
+    // НА ПРИЕМКЕ - площадка получения может завершить или отменить
+    else if (request.status === 'на_приемке') {
+      if (isAdmin || (user?.role === 'manager' && request.transferWarehouseId === user?.warehouseId) || 
+          (user?.role === 'warehouseman' && request.transferWarehouseId === user?.warehouseId)) {
         buttons.push(
           <button
             key="complete"
-            onClick={() => handleStatusChange(request, 'completed')}
+            onClick={() => handleStatusChange(request, 'завершено')}
             className="btn-complete"
-            title="Принять доставку"
+            title="Приемка завершена"
           >
-            ✓ Принято
+            ✓ Завершено
           </button>
         );
-      }
-    } else if (request.status === 'rejected') {
-      if (isAdmin || (user?.role === 'manager' && request.warehouseId === user?.warehouseId)) {
         buttons.push(
           <button
-            key="cancel"
-            onClick={() => handleStatusChange(request, 'pending')}
-            className="btn-secondary"
-            title="Вернуть в ожидание"
+            key="cancel-reception"
+            onClick={() => handleStatusChange(request, 'отменено')}
+            className="btn-reject"
+            title="Отменить приемку (расхождение)"
           >
-            ↶ Отмена
+            ✗ Расхождение
           </button>
         );
       }
+    }
+    // ЗАВЕРШЕНО - никаких действий
+    else if (request.status === 'завершено') {
+      // Кнопок нет
+    }
+    // ОТМЕНЕНО - никаких действий
+    else if (request.status === 'отменено') {
+      // Кнопок нет
     }
 
     return buttons;
@@ -538,11 +670,13 @@ export const RequestsPage = () => {
 
   const getStatusLabel = (status: RequestStatus): string => {
     const labels: Record<RequestStatus, string> = {
-      pending: 'Ожидание',
-      approved: 'Одобрено',
-      in_transit: 'В пути',
-      completed: 'Завершено',
-      rejected: 'Отклонено',
+      'черновик': 'Черновик',
+      'на_согласовании': 'На согласовании',
+      'одобрено': 'Одобрено',
+      'в_пути': 'В пути',
+      'на_приемке': 'На приемке',
+      'завершено': 'Завершено',
+      'отменено': 'Отменено',
     };
     return labels[status] || status;
   };
@@ -588,7 +722,7 @@ export const RequestsPage = () => {
 
       {showForm && (
         <div className="form-card">
-          <h3>{selectedRequest?.status === 'pending' ? `Редактирование заявки ${selectedRequest?.requestNumber}` : 'Создать новую заявку'}</h3>
+          <h3>{selectedRequest?.status === 'черновик' ? `Редактирование заявки ${selectedRequest?.requestNumber}` : 'Создать новую заявку'}</h3>
           <form onSubmit={handleCreateRequest}>
             <div className="form-grid">
               {isAdmin && (
@@ -824,7 +958,7 @@ export const RequestsPage = () => {
             </div>
 
             <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '16px' }}>
-              {selectedRequest?.status === 'pending' ? 'Обновить заявку' : 'Создать заявку'}
+              {selectedRequest?.status === 'черновик' ? 'Обновить заявку' : 'Создать заявку'}
             </button>
           </form>
         </div>
@@ -894,11 +1028,13 @@ export const RequestsPage = () => {
                 const fromWarehouse = warehouses.find((w) => w.id === request.warehouseId);
                 const toWarehouse = request.transferWarehouseId ? warehouses.find((w) => w.id === request.transferWarehouseId) : null;
                 const statusColor = {
-                  pending: '#f39c12',
-                  approved: '#3498db',
-                  in_transit: '#9b59b6',
-                  completed: '#27ae60',
-                  rejected: '#e74c3c',
+                  'черновик': '#95a5a6',
+                  'на_согласовании': '#f39c12',
+                  'одобрено': '#3498db',
+                  'в_пути': '#9b59b6',
+                  'на_приемке': '#e67e22',
+                  'завершено': '#27ae60',
+                  'отменено': '#e74c3c',
                 }[request.status] || '#95a5a6';
 
                 return (
