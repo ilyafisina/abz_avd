@@ -164,7 +164,7 @@ export const mockRequests: Request[] = [
     id: '1',
     requestNumber: 'REQ-2024-001',
     requestType: 'incoming',
-    status: 'pending',
+    status: 'черновик',
     warehouseId: 1,
     products: [
       {
@@ -182,7 +182,7 @@ export const mockRequests: Request[] = [
     id: '2',
     requestNumber: 'REQ-2024-002',
     requestType: 'writeoff',
-    status: 'approved',
+    status: 'одобрено',
     warehouseId: 1,
     products: [
       {
@@ -201,7 +201,7 @@ export const mockRequests: Request[] = [
     id: '3',
     requestNumber: 'REQ-2024-003',
     requestType: 'transfer',
-    status: 'pending',
+    status: 'черновик',
     warehouseId: 1,
     transferWarehouseId: 2,
     products: [
@@ -377,7 +377,7 @@ export const requestService = {
     const request = mockRequests.find(r => r.id === id);
     if (request) {
       request.status = status;
-      if (status === 'completed') {
+      if (status === 'завершено') {
         request.completedAt = new Date();
       }
     }
@@ -388,7 +388,7 @@ export const requestService = {
     await new Promise(resolve => setTimeout(resolve, 300));
     const request = mockRequests.find(r => r.id === id);
     if (request) {
-      request.status = 'approved';
+      request.status = 'одобрено';
       request.approvedBy = approvedBy;
       request.approvedAt = new Date();
     }
@@ -399,7 +399,7 @@ export const requestService = {
     await new Promise(resolve => setTimeout(resolve, 300));
     const request = mockRequests.find(r => r.id === id);
     if (request) {
-      request.status = 'rejected';
+      request.status = 'отменено';
     }
     return request;
   },

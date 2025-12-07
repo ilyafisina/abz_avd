@@ -27,7 +27,18 @@ public class UsersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<User>>> GetUsers()
     {
-        return await _context.Users.Include(u => u.Warehouse).ToListAsync();
+        var users = await _context.Users.Include(u => u.Warehouse).ToListAsync();
+        
+        // Обновляем статус онлайн для каждого пользователя
+        foreach (var user in users)
+        {
+            if (user.LastSeenAt.HasValue && (DateTime.Now - user.LastSeenAt.Value).TotalMinutes > 30)
+            {
+                user.IsOnline = false;
+            }
+        }
+        
+        return users;
     }
 
     [HttpGet("{id}")]
@@ -36,6 +47,13 @@ public class UsersController : ControllerBase
         var user = await _context.Users.Include(u => u.Warehouse).FirstOrDefaultAsync(u => u.Id == id);
         if (user == null)
             return NotFound();
+        
+        // Если последнее посещение более 30 минут назад, считаем пользователя офлайн
+        if (user.LastSeenAt.HasValue && (DateTime.Now - user.LastSeenAt.Value).TotalMinutes > 30)
+        {
+            user.IsOnline = false;
+        }
+        
         return user;
     }
 

@@ -133,9 +133,9 @@ export const UsersPage = () => {
     setIsNew(false);
     setEditingUser(userToEdit);
     setFormData({
-      username: userToEdit.username,
+      username: userToEdit.username || '',
       email: userToEdit.email || '',
-      phone: userToEdit.phone || '',
+      phone: userToEdit.phone ? String(userToEdit.phone) : '',
       firstName: userToEdit.firstName || '',
       lastName: userToEdit.lastName || '',
       passwordHash: userToEdit.passwordHash || '',
@@ -294,6 +294,23 @@ export const UsersPage = () => {
     const hStr = h < 10 ? '0' + h : h;
     const mStr = m < 10 ? '0' + m : m;
     return lastSeenDate.toLocaleDateString('ru-RU') + ' ' + hStr + ':' + mStr;
+  };
+
+  const getOnlineStatus = (user: User): boolean => {
+    // Бэк должен вернуть правильный isOnline, но дополнительно проверим на фронтенде
+    if (!user.lastSeenAt) {
+      return user.isOnline ?? false;
+    }
+    try {
+      const lastSeenDate = new Date(user.lastSeenAt);
+      if (isNaN(lastSeenDate.getTime())) {
+        return user.isOnline ?? false;
+      }
+      const diffMinutes = (new Date().getTime() - lastSeenDate.getTime()) / 60000;
+      return diffMinutes <= 30;
+    } catch {
+      return user.isOnline ?? false;
+    }
   };
 
   return (
@@ -523,7 +540,7 @@ export const UsersPage = () => {
 
             <div style={{ backgroundColor: 'var(--surface-secondary)', padding: '16px', borderRadius: '6px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <span style={{ fontSize: '20px' }}>{selectedUserReport.isOnline ? '🟢 Онлайн' : '⚪ Офлайн'}</span>
+                <span style={{ fontSize: '20px' }}>{getOnlineStatus(selectedUserReport) ? '🟢 Онлайн' : '⚪ Офлайн'}</span>
               </div>
               <div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 4px 0' }}>Последнее посещение</p>

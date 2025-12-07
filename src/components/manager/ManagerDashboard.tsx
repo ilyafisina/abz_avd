@@ -33,7 +33,7 @@ export const ManagerDashboard: React.FC = () => {
 
   const totalValue = products.reduce((sum, p) => sum + p.quantity * p.price, 0);
   const totalProducts = products.length;
-  const activeRequests = requests.filter(r => r.status === 'pending').length;
+  const activeRequests = requests.filter(r => r.status === 'черновик').length;
 
   return (
     <div className="dashboard manager-dashboard">
@@ -199,7 +199,7 @@ const RequestsTab: React.FC<{
               {request.notes && <p><strong>Примечание:</strong> {request.notes}</p>}
             </div>
             <div className="request-actions">
-              {request.status === 'pending' && (
+              {request.status === 'черновик' && (
                 <>
                   <button className="btn btn-success btn-small">Одобрить</button>
                   <button className="btn btn-danger btn-small">Отклонить</button>
@@ -242,7 +242,7 @@ const LocationsTab: React.FC<{ products: Product[] }> = ({ products }) => {
 };
 
 const ReportTab: React.FC<{ products: Product[]; requests: Request[] }> = ({ products, requests }) => {
-  const completedRequests = requests.filter(r => r.status === 'completed').length;
+  const completedRequests = requests.filter(r => r.status === 'завершено').length;
   const averageStockValue = products.length > 0
     ? products.reduce((sum, p) => sum + p.quantity * p.price, 0) / products.length
     : 0;

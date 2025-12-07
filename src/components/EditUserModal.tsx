@@ -111,7 +111,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             <input
               id="user-phone"
               type="tel"
-              value={formData.phone || ''}
+              value={String(formData.phone || '')}
               onChange={(e) => onFormChange('phone', e.target.value)}
               placeholder="+7 (999) 999-99-99"
               disabled={isLoading}

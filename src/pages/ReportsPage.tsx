@@ -357,11 +357,11 @@ export const ReportsPage = () => {
             </div>
             <div className="stat-item">
               <span className="stat-label">Ожидают подтверждения:</span>
-              <span className="stat-value">{requests.filter(r => r.status === 'pending').length}</span>
+              <span className="stat-value">{requests.filter(r => r.status === 'черновик' || r.status === 'на_согласовании').length}</span>
             </div>
             <div className="stat-item">
               <span className="stat-label">Завершённых:</span>
-              <span className="stat-value">{requests.filter(r => r.status === 'completed').length}</span>
+              <span className="stat-value">{requests.filter(r => r.status === 'завершено').length}</span>
             </div>
           </div>
 

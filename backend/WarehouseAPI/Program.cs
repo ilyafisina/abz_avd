@@ -6,11 +6,13 @@ using WarehouseAPI.Services;
 using System.Text.Json.Serialization;
 using System.Text;
 using log4net;
+using log4net.Config;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure log4net
-log4net.Config.XmlConfigurator.Configure(new System.IO.FileInfo("log4net.config"));
+var logRepository = LogManager.GetRepository(System.Reflection.Assembly.GetEntryAssembly());
+XmlConfigurator.Configure(logRepository, new System.IO.FileInfo("log4net.config"));
 
 // JWT Configuration
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

@@ -15,6 +15,7 @@ public class WarehouseContext : DbContext
     public DbSet<Product> Products { get; set; }
     public DbSet<Request> Requests { get; set; }
     public DbSet<RequestProduct> RequestProducts { get; set; }
+    public DbSet<ReservedProduct> ReservedProducts { get; set; }
     public DbSet<Transfer> Transfers { get; set; }
     public DbSet<TransferProduct> TransferProducts { get; set; }
     public DbSet<TransferComment> TransferComments { get; set; }
@@ -215,6 +216,36 @@ public class WarehouseContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ReservedProduct configuration
+        modelBuilder.Entity<ReservedProduct>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Status).HasMaxLength(50).IsRequired();
+
+            entity.HasOne(e => e.Product)
+                .WithMany()
+                .HasForeignKey(e => e.ProductId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            entity.HasOne(e => e.Warehouse)
+                .WithMany()
+                .HasForeignKey(e => e.WarehouseId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            entity.HasOne(e => e.Request)
+                .WithMany()
+                .HasForeignKey(e => e.RequestId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            // Индексы для быстрого поиска
+            entity.HasIndex(e => new { e.WarehouseId, e.Status });
+            entity.HasIndex(e => e.RequestId);
+            entity.HasIndex(e => e.ProductId);
         });
 
         // AuditLog configuration

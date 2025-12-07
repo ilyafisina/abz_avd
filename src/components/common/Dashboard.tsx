@@ -231,21 +231,21 @@ export const Dashboard: React.FC = () => {
               <div className="analytics-cards">
                 <AnalyticsCard
                   title="Выполненные заявки"
-                  value={requests.filter(r => r.status === 'completed').length}
+                  value={requests.filter(r => r.status === 'завершено').length}
                   total={requests.length}
-                  percentage={((requests.filter(r => r.status === 'completed').length / requests.length) * 100).toFixed(0)}
+                  percentage={((requests.filter(r => r.status === 'завершено').length / requests.length) * 100).toFixed(0)}
                 />
                 <AnalyticsCard
                   title="Товары в пути"
-                  value={requests.filter(r => r.status === 'in_transit').length}
+                  value={requests.filter(r => r.status === 'в_пути').length}
                   total={requests.length}
-                  percentage={((requests.filter(r => r.status === 'in_transit').length / requests.length) * 100).toFixed(0)}
+                  percentage={((requests.filter(r => r.status === 'в_пути').length / requests.length) * 100).toFixed(0)}
                 />
                 <AnalyticsCard
                   title="Отклоненные заявки"
-                  value={requests.filter(r => r.status === 'rejected').length}
+                  value={requests.filter(r => r.status === 'отменено').length}
                   total={requests.length}
-                  percentage={((requests.filter(r => r.status === 'rejected').length / requests.length) * 100).toFixed(0)}
+                  percentage={((requests.filter(r => r.status === 'отменено').length / requests.length) * 100).toFixed(0)}
                 />
               </div>
             </div>
@@ -346,11 +346,11 @@ interface RecentActivitySectionProps {
 
 const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({ requests }) => {
   const statuses = {
-    pending: requests.filter(r => r.status === 'pending').length,
-    approved: requests.filter(r => r.status === 'approved').length,
-    in_transit: requests.filter(r => r.status === 'in_transit').length,
-    completed: requests.filter(r => r.status === 'completed').length,
-    rejected: requests.filter(r => r.status === 'rejected').length,
+    черновик: requests.filter(r => r.status === 'черновик').length,
+    на_согласовании: requests.filter(r => r.status === 'на_согласовании').length,
+    в_пути: requests.filter(r => r.status === 'в_пути').length,
+    завершено: requests.filter(r => r.status === 'завершено').length,
+    отменено: requests.filter(r => r.status === 'отменено').length,
   };
 
   return (
@@ -359,11 +359,11 @@ const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({ requests 
         <h3>Статистика заявок</h3>
       </div>
       <div className="activity-stats">
-        <ActivityItem label="На рассмотрении" count={statuses.pending} color="warning" />
-        <ActivityItem label="Одобрено" count={statuses.approved} color="info" />
-        <ActivityItem label="В пути" count={statuses.in_transit} color="primary" />
-        <ActivityItem label="Завершено" count={statuses.completed} color="success" />
-        <ActivityItem label="Отклонено" count={statuses.rejected} color="danger" />
+        <ActivityItem label="На рассмотрении" count={statuses.черновик} color="warning" />
+        <ActivityItem label="На согласовании" count={statuses.на_согласовании} color="info" />
+        <ActivityItem label="В пути" count={statuses.в_пути} color="primary" />
+        <ActivityItem label="Завершено" count={statuses.завершено} color="success" />
+        <ActivityItem label="Отменено" count={statuses.отменено} color="danger" />
       </div>
     </div>
   );

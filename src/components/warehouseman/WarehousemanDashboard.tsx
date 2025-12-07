@@ -27,7 +27,7 @@ export const WarehousemanDashboard: React.FC = () => {
         apiService.getRequests(),
       ]);
       setProducts(productsData);
-      setRequests(requestsData.filter(r => r.status !== 'completed'));
+      setRequests(requestsData.filter(r => r.status !== 'завершено'));
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +64,7 @@ export const WarehousemanDashboard: React.FC = () => {
           <div className="stat-icon"><FiClipboard size={32} className="icon" /></div>
           <div className="stat-content">
             <p className="stat-label">Активные заявки</p>
-            <p className="stat-value">{requests.filter(r => r.status === 'pending').length}</p>
+            <p className="stat-value">{requests.filter(r => r.status === 'черновик').length}</p>
           </div>
         </div>
         <div className="stat-card">

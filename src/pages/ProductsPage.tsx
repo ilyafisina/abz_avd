@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/useAuth';
 import { useNotification } from '../contexts/useNotification';
 import { QRScanner } from '../components/QRScanner';
 import { EditProductModal } from '../components/EditProductModal';
+import { ProductDetailModal } from '../components/ProductDetailModal';
 import '../components/QRScanner.css';
 import './Pages.css';
 
@@ -22,6 +23,8 @@ export const ProductsPage = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -170,6 +173,11 @@ export const ProductsPage = () => {
       supplier: '',
     });
     setShowAddForm(false);
+  };
+
+  const handleViewDetail = (product: Product) => {
+    setSelectedProduct(product);
+    setShowDetailModal(true);
   };
 
   const handleEdit = (product: Product) => {
@@ -507,6 +515,13 @@ export const ProductsPage = () => {
                     )}
                     <td className="actions">
                       <button
+                        onClick={() => handleViewDetail(product)}
+                        className="btn-action btn-view"
+                        title="Просмотреть детали"
+                      >
+                        Детали
+                      </button>
+                      <button
                         onClick={() => handleEdit(product)}
                         className="btn-action btn-edit"
                         title="Редактировать товар"
@@ -532,6 +547,31 @@ export const ProductsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Модали */}
+      <EditProductModal
+        product={editingProduct}
+        isOpen={showEditModal}
+        formData={formData}
+        onFormChange={(field, value) => {
+          setFormData({ ...formData, [field]: value });
+        }}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingProduct(null);
+        }}
+        onSave={handleEditSave}
+        isLoading={isSaving}
+      />
+
+      <ProductDetailModal
+        product={selectedProduct}
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedProduct(null);
+        }}
+      />
     </div>
   );
 };

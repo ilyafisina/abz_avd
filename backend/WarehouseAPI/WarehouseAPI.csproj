@@ -15,7 +15,12 @@
     </PackageReference>
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.6" />
-    <PackageReference Include="log4net" Version="2.0.15" />
+    <PackageReference Include="log4net" Version="2.0.16" />
+  </ItemGroup>
+
+  <!-- Copy log4net.config to output -->
+  <ItemGroup>
+    <None Update="log4net.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
