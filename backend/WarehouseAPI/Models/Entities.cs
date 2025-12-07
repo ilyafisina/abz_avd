@@ -148,14 +148,33 @@ public class Request
 {
     public int Id { get; set; }
     public int UserId { get; set; }
-    public int WarehouseId { get; set; } // FK to Warehouse.Id
-    public int? TransferWarehouseId { get; set; } // FK to Warehouse.Id
-    public string Status { get; set; } = "pending"; // pending, approved, in_transit, rejected, completed
+    public int WarehouseId { get; set; } // FK to Warehouse.Id (площадка отправления)
+    public int? TransferWarehouseId { get; set; } // FK to Warehouse.Id (площадка получения)
+    // Статусы: draft, on_review, approved, in_transit, on_reception, cancelled, completed
+    public string Status { get; set; } = "draft";
     public string? Notes { get; set; }
+    
+    // Информация о согласовании
+    public int? ReviewedBy { get; set; } // Кто согласовал/отклонил заявку
+    public DateTime? ReviewedAt { get; set; }
+    
+    // Информация об утверждении
     public int? ApprovedBy { get; set; }
     public DateTime? ApprovedAt { get; set; }
+    
+    // Информация о приемке
+    public int? ReceivedBy { get; set; } // Кто принял товары
+    public DateTime? ReceivedAt { get; set; }
+    
+    // Информация о завершении
     public int? CompletedBy { get; set; }
     public DateTime? CompletedAt { get; set; }
+    
+    // Информация об отмене
+    public int? CancelledBy { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public string? CancellationReason { get; set; }
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
@@ -165,6 +184,16 @@ public class Request
     public Warehouse? TransferWarehouse { get; set; }
     [JsonInclude]
     public ICollection<RequestProduct> RequestProducts { get; set; } = new List<RequestProduct>();
+    
+    // Навигационные свойства к пользователям
+    [JsonInclude]
+    public User? ApprovedByUser { get; set; }
+    [JsonInclude]
+    public User? ReceivedByUser { get; set; }
+    [JsonInclude]
+    public User? CompletedByUser { get; set; }
+    [JsonInclude]
+    public User? CancelledByUser { get; set; }
 }
 
 public class RequestProduct
@@ -172,11 +201,32 @@ public class RequestProduct
     public int Id { get; set; }
     public int RequestId { get; set; }
     public int ProductId { get; set; }
-    public int Quantity { get; set; }
+    public int ReservedQuantity { get; set; } // Зарезервированное количество
+    public int? ReceivedQuantity { get; set; } // Фактически полученное количество при приемке
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     [JsonIgnore]
     public Request Request { get; set; } = null!;
     public Product Product { get; set; } = null!;
+}
+
+// Новый класс для отслеживания зарезервированных товаров на площадке получения
+public class ReservedProduct
+{
+    public int Id { get; set; }
+    public int ProductId { get; set; }
+    public int WarehouseId { get; set; } // Площадка получения
+    public int RequestId { get; set; } // Какая заявка зарезервировала
+    public int ReservedQuantity { get; set; }
+    public string Status { get; set; } = "pending"; // pending, received, cancelled
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [JsonIgnore]
+    public Product? Product { get; set; }
+    [JsonIgnore]
+    public Warehouse? Warehouse { get; set; }
+    [JsonIgnore]
+    public Request? Request { get; set; }
 }
