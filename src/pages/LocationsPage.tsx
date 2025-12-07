@@ -106,6 +106,8 @@ export const LocationsPage = () => {
           const createdUser = usersData.find((u: User) => String(u.id) === String(req.createdBy));
           const approvedUser = req.approvedBy ? usersData.find((u: User) => String(u.id) === String(req.approvedBy)) : undefined;
           const completedUser = req.completedBy ? usersData.find((u: User) => String(u.id) === String(req.completedBy)) : undefined;
+          const receivedUser = req.receivedBy ? usersData.find((u: User) => String(u.id) === String(req.receivedBy)) : undefined;
+          const cancelledUser = req.cancelledBy ? usersData.find((u: User) => String(u.id) === String(req.cancelledBy)) : undefined;
           
           return {
             id: Number(req.id),
@@ -116,11 +118,19 @@ export const LocationsPage = () => {
             status: req.status,
             products: req.products || [],
             createdBy: req.createdBy,
+            createdAt: req.createdAt,
             createdByUser: createdUser,
             approvedBy: req.approvedBy,
+            approvedAt: req.approvedAt,
             approvedByUser: approvedUser,
             completedBy: req.completedBy,
             completedByUser: completedUser,
+            receivedBy: req.receivedBy,
+            receivedAt: req.receivedAt,
+            receivedByUser: receivedUser,
+            cancelledBy: req.cancelledBy,
+            cancelledAt: req.cancelledAt,
+            cancelledByUser: cancelledUser,
           };
         });
         setTransfers(transfersData || []);
@@ -144,6 +154,8 @@ export const LocationsPage = () => {
         const createdUser = users.find((u: User) => String(u.id) === String(req.createdBy));
         const approvedUser = req.approvedBy ? users.find((u: User) => String(u.id) === String(req.approvedBy)) : undefined;
         const completedUser = req.completedBy ? users.find((u: User) => String(u.id) === String(req.completedBy)) : undefined;
+        const receivedUser = req.receivedBy ? users.find((u: User) => String(u.id) === String(req.receivedBy)) : undefined;
+        const cancelledUser = req.cancelledBy ? users.find((u: User) => String(u.id) === String(req.cancelledBy)) : undefined;
         
         return {
           id: Number(req.id),
@@ -154,11 +166,19 @@ export const LocationsPage = () => {
           status: req.status,
           products: req.products || [],
           createdBy: req.createdBy,
+          createdAt: req.createdAt,
           createdByUser: createdUser,
           approvedBy: req.approvedBy,
+          approvedAt: req.approvedAt,
           approvedByUser: approvedUser,
           completedBy: req.completedBy,
           completedByUser: completedUser,
+          receivedBy: req.receivedBy,
+          receivedAt: req.receivedAt,
+          receivedByUser: receivedUser,
+          cancelledBy: req.cancelledBy,
+          cancelledAt: req.cancelledAt,
+          cancelledByUser: cancelledUser,
         };
       });
       setTransfers(transfersData || []);
@@ -167,113 +187,210 @@ export const LocationsPage = () => {
     }
   };
 
-  const generateTTN = async (request: Request) => {
+   const generateTTN = async (request: Request) => {
     const fromWarehouse = warehouses.find((w) => w.id === request.warehouseId);
     const toWarehouse = request.transferWarehouseId ? warehouses.find((w) => w.id === request.transferWarehouseId) : null;
+    const createdUser = users.find((u) => String(u.id) === String(request.createdBy));
+    const approvedUser = request.approvedBy ? users.find((u) => String(u.id) === String(request.approvedBy)) : null;
+    const receivedUser = request.receivedBy ? users.find((u) => String(u.id) === String(request.receivedBy)) : null;
     
     let totalQuantity = 0;
     request.products.forEach((product) => {
       totalQuantity += product.quantity;
     });
 
-    // Создаём HTML для PDF
+    // Получаем полный номер документа (REQ-9)
+    const docNumber = request.requestNumber;
+    const barcodeNumber = request.requestNumber.replace('REQ-', '');
+
+    // Функция для генерации штрихкода (Code128)
+    const generateBarcode = (value: string) => {
+      const codes: { [key: string]: string } = {
+        '0': '11011001100', '1': '11100110100', '2': '11100100110', '3': '11100100011',
+        '4': '11101100100', '5': '11101001100', '6': '11101001010', '7': '11100101100',
+        '8': '11100101001', '9': '11101010100', '-': '11101010001', '.': '11101001001',
+        ' ': '11001101100', '*': '11001110010', '+': '11010001100', '/': '11010010100',
+        ':': '11010010010', ';': '11010100100', '<': '11010100010', '=': '11010010001',
+        '>': '11010001010', '?': '11010001001', '@': '11010100101'
+      };
+      
+      // Упрощённая генерация - используем значения как палочки
+      let barcode = '';
+      for (let i = 0; i < value.length; i++) {
+        const char = value[i];
+        if (codes[char]) {
+          barcode += codes[char].split('').map(bit => bit === '1' ? '█' : ' ').join('');
+        } else {
+          barcode += '█ ';
+        }
+      }
+      return barcode;
+    };
+
+    const barcode = generateBarcode(docNumber);
+
+    // Определяем роль создателя (отпустил)
+    const releasedByRole = createdUser?.role === 'admin' ? 'Заведующий' : createdUser?.role === 'manager' ? 'Менеджер склада' : 'Кладовщик';
+    
+    // Определяем роль одобрившего
+    const approvedByRole = approvedUser?.role === 'admin' ? 'Начальник' : 'Менеджер';
+
+    // Создаём HTML для PDF согласно форме ТОРГ-13
     const htmlContent = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; color: #000;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="margin: 0; font-size: 18px;">ООО "ЛОГИСТИЧЕСКИЙ ЦЕНТР"</h2>
-          <p style="margin: 5px 0; font-size: 12px;">АД: г. Москва, ул. Логистическая, д. 1</p>
-          <p style="margin: 5px 0; font-size: 12px;">Тел: +7 (495) 123-45-67 | Email: info@logistics.ru</p>
-          <hr style="border: none; border-top: 1px solid #000; margin: 10px 0;" />
-          <h1 style="margin: 10px 0; font-size: 16px;">ТОВАРОТРАНСПОРТНАЯ НАКЛАДНАЯ (ТТН)</h1>
+      <div style="font-family: 'Times New Roman', serif; padding: 20px; line-height: 1.3; color: #000; font-size: 10px; position: relative;">
+        
+        <!-- Штрихкод в верхнем левом углу -->
+        <div style="position: absolute; top: 15px; left: 15px; text-align: center;">
+          <div style="font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 1px; font-weight: bold; line-height: 1; margin-bottom: 2px;">
+            ${barcode}
+          </div>
+          <div style="font-size: 8px; font-weight: bold; margin-top: 2px;">${docNumber}</div>
         </div>
 
-        <div style="margin-bottom: 15px;">
-          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">ДАННЫЕ ДОКУМЕНТА</h3>
-          <table style="width: 100%; font-size: 11px;">
+        <!-- Реквизиты в верхнем правом углу -->
+        <div style="position: absolute; top: 15px; right: 15px; text-align: right; font-size: 8px; line-height: 1.5;">
+          <div><strong>Форма по ОКУД:</strong> 0330213</div>
+          <div><strong>Код по ОКПО:</strong> 00001000</div>
+          <div><strong>Вид деятельности:</strong> 46</div>
+          <div><strong>Вид операции:</strong> 11</div>
+        </div>
+
+        <div style="margin-top: 60px; margin-bottom: 15px; text-align: center;">
+          <h3 style="margin: 0; font-size: 12px; font-weight: bold;">Унифицированная форма № ТОРГ-13</h3>
+          <p style="margin: 2px 0; font-size: 8px;">Утверждена постановлением Госкомстата России от 25.12.98 № 132</p>
+        </div>
+
+        <div style="margin-bottom: 10px; border: 1px solid #000; padding: 8px;">
+          <p style="margin: 0; font-weight: bold; font-size: 10px;">ОРГАНИЗАЦИЯ</p>
+          <p style="margin: 2px 0; font-size: 9px;">
+            <strong>ООО "АБЗ-ВАД"</strong><br/>
+            Автомеханический завод по производству запасных частей<br/>
+            ИНН 7701234567, КПП 770101001<br/>
+            г. Москва, ул. Автозаводская, д. 23, тел.: (495) 123-45-67
+          </p>
+        </div>
+
+        <div style="margin-bottom: 10px; border: 1px solid #000; padding: 8px;">
+          <table style="width: 100%; font-size: 9px;">
             <tr>
-              <td style="width: 50%;">Номер ТТН: ${request.requestNumber}</td>
-              <td>Дата: ${new Date(request.createdAt).toLocaleDateString('ru-RU')}</td>
+              <td style="width: 50%; padding-right: 8px;">
+                <strong>Номер документа:</strong> ${docNumber}
+              </td>
+              <td style="width: 50%; padding-left: 8px;">
+                <strong>Дата составления:</strong> ${new Date(request.createdAt).toLocaleDateString('ru-RU')}
+              </td>
             </tr>
-            <tr>
-              <td>Статус: ${request.status}</td>
+            <tr style="border-top: 1px solid #000;">
+              <td colspan="2" style="padding-top: 5px; text-align: center; font-weight: bold;">
+                НАКЛАДНАЯ на внутреннее перемещение, передачу товаров, тары
+              </td>
             </tr>
           </table>
         </div>
 
-        <div style="margin-bottom: 15px;">
-          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">СТОРОНЫ ТРАНСПОРТИРОВКИ</h3>
-          <table style="width: 100%; font-size: 11px;">
+        <!-- Стороны транспортировки -->
+        <div style="margin-bottom: 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
             <tr>
-              <td style="width: 50%; padding: 5px; border: 1px solid #000; vertical-align: top;">
-                <strong>От (отправитель):</strong><br/>
-                ${fromWarehouse?.name || 'Неизвестно'}<br/>
-                <strong>Адрес:</strong> ${fromWarehouse?.location || 'Не указан'}
+              <td style="width: 33%; border: 1px solid #000; padding: 6px; vertical-align: top;">
+                <strong>Отправитель</strong><br/>
+                <strong>структурное подразделение:</strong><br/>${fromWarehouse?.name || 'Не указано'}<br/>
+                <strong>вид деятельности:</strong> 46
               </td>
-              <td style="width: 50%; padding: 5px; border: 1px solid #000; vertical-align: top;">
-                <strong>Кому (получатель):</strong><br/>
-                ${toWarehouse?.name || 'Не указано'}<br/>
-                <strong>Адрес:</strong> ${toWarehouse?.location || 'Не указан'}
+              <td style="width: 33%; border: 1px solid #000; padding: 6px; vertical-align: top;">
+                <strong>Получатель</strong><br/>
+                <strong>структурное подразделение:</strong><br/>${toWarehouse?.name || 'Не указано'}<br/>
+                <strong>вид деятельности:</strong> 46
+              </td>
+              <td style="width: 34%; border: 1px solid #000; padding: 6px; vertical-align: top;">
+                <strong>Корреспондирующий счет</strong><br/>
+                <strong>счет, субсчет:</strong> 10-01<br/>
+                <strong>код аналитического учета:</strong> 001
               </td>
             </tr>
           </table>
         </div>
 
-        <div style="margin-bottom: 15px;">
-          <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">СПИСОК ТОВАРОВ</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+        <!-- Таблица товаров -->
+        <div style="margin-bottom: 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 8px;">
             <thead>
-              <tr style="background-color: #f0f0f0;">
-                <th style="border: 1px solid #000; padding: 5px; text-align: left;">№</th>
-                <th style="border: 1px solid #000; padding: 5px; text-align: left;">Наименование товара</th>
-                <th style="border: 1px solid #000; padding: 5px; text-align: center;">Кол-во</th>
-                <th style="border: 1px solid #000; padding: 5px; text-align: left;">Место хранения</th>
+              <tr style="border: 1px solid #000; background-color: #f8f8f8;">
+                <th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">Товар, тара</th>
+                <th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">Единица измерения</th>
+                <th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">Отпущено</th>
+              </tr>
+              <tr style="border: 1px solid #000; background-color: #f8f8f8;">
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">наименование</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">код</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">в одном месте</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">мест, штук</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">брутто</td>
+                <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 7px;">нетто</td>
               </tr>
             </thead>
             <tbody>
-              ${request.products.map((product, idx) => `
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;">${idx + 1}</td>
-                  <td style="border: 1px solid #000; padding: 5px;">${product.productName}</td>
-                  <td style="border: 1px solid #000; padding: 5px; text-align: center;">${product.quantity}</td>
-                  <td style="border: 1px solid #000; padding: 5px;">${product.location || '-'}</td>
+              ${request.products.map((product) => `
+                <tr style="border: 1px solid #000;">
+                  <td style="border: 1px solid #000; padding: 3px;">${product.productName}</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">шт</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">1</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">1</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">${product.quantity}</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;">${product.quantity}</td>
                 </tr>
               `).join('')}
-              <tr style="font-weight: bold;">
-                <td colspan="2" style="border: 1px solid #000; padding: 5px; text-align: right;">ИТОГО:</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${totalQuantity}</td>
-                <td style="border: 1px solid #000; padding: 5px;">Товаров: ${request.products.length}</td>
+              <tr style="border: 1px solid #000; font-weight: bold; background-color: #f8f8f8;">
+                <td colspan="2" style="border: 1px solid #000; padding: 3px; text-align: right;">Итого</td>
+                <td style="border: 1px solid #000; padding: 3px; text-align: center;">1</td>
+                <td style="border: 1px solid #000; padding: 3px; text-align: center;">${request.products.length}</td>
+                <td style="border: 1px solid #000; padding: 3px; text-align: center;">${totalQuantity}</td>
+                <td style="border: 1px solid #000; padding: 3px;"></td>
+              </tr>
+              <tr style="border: 1px solid #000;">
+                <td colspan="6" style="border: 1px solid #000; padding: 3px;"><strong>Всего по накладной</strong></td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        ${request.notes ? `
-          <div style="margin-bottom: 15px;">
-            <h3 style="margin: 0 0 5px 0; font-size: 12px; font-weight: bold;">ПРИМЕЧАНИЯ</h3>
-            <p style="margin: 5px 0; font-size: 11px; padding: 10px; border: 1px solid #000; background-color: #fafafa;">
-              ${request.notes}
-            </p>
-          </div>
-        ` : ''}
-
-        <div style="margin-top: 30px; display: flex; justify-content: space-between;">
-          <div style="text-align: center; flex: 1;">
-            <div style="height: 40px; border-top: 1px solid #000;"></div>
-            <p style="margin: 3px 0; font-size: 10px;">Подпись отправителя</p>
-          </div>
-          <div style="text-align: center; flex: 1;">
-            <div style="height: 40px; border-top: 1px solid #000;"></div>
-            <p style="margin: 3px 0; font-size: 10px;">Подпись менеджера</p>
-          </div>
-          <div style="text-align: center; flex: 1;">
-            <div style="height: 40px; border-top: 1px solid #000;"></div>
-            <p style="margin: 3px 0; font-size: 10px;">Подпись получателя</p>
-          </div>
+        <!-- Подписи -->
+        <div style="margin-top: 15px;">
+          <table style="width: 100%; font-size: 9px; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #000;">
+              <td style="width: 50%; padding: 8px; text-align: center; vertical-align: top;">
+                <strong>Отпустил ${releasedByRole}</strong><br/>
+                <span style="font-size: 8px;">${createdUser?.firstName} ${createdUser?.lastName}</span><br/>
+                <div style="height: 30px; margin: 5px 0;"></div>
+                <div style="border-top: 1px solid #000; font-size: 8px;">подпись</div>
+              </td>
+              <td style="width: 50%; padding: 8px; text-align: center; vertical-align: top;">
+                <strong>Одобрил ${approvedByRole}</strong><br/>
+                <span style="font-size: 8px;">${approvedUser?.firstName} ${approvedUser?.lastName}</span><br/>
+                <div style="height: 30px; margin: 5px 0;"></div>
+                <div style="border-top: 1px solid #000; font-size: 8px;">подпись</div>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #000;">
+              <td style="width: 50%; padding: 8px; text-align: center; vertical-align: top;">
+                <strong>Сумма словами:</strong><br/>
+                <span style="font-size: 8px;">По учёту</span>
+              </td>
+              <td style="width: 50%; padding: 8px; text-align: center; vertical-align: top;">
+                <strong>Принял Кладовщик</strong><br/>
+                <span style="font-size: 8px;">${receivedUser?.firstName} ${receivedUser?.lastName}</span><br/>
+                <div style="height: 30px; margin: 5px 0;"></div>
+                <div style="border-top: 1px solid #000; font-size: 8px;">подпись</div>
+              </td>
+            </tr>
+          </table>
         </div>
 
-        <div style="margin-top: 20px; text-align: center; font-size: 9px; color: #666;">
-          <p style="margin: 0;">Документ создан: ${new Date().toLocaleString('ru-RU')}</p>
+        <div style="margin-top: 15px; font-size: 8px; text-align: center; color: #333; border-top: 1px solid #000; padding-top: 8px;">
+          <p style="margin: 2px 0;">Статус: <strong>${request.status === 'завершено' ? 'Завершено' : request.status === 'отменено' ? 'Отменено' : 'На согласовании'}</strong></p>
+          <p style="margin: 2px 0;">Создано: ${new Date(request.createdAt).toLocaleString('ru-RU')}</p>
         </div>
+
       </div>
     `;
 
@@ -284,6 +401,8 @@ export const LocationsPage = () => {
     element.style.left = '-9999px';
     element.style.width = '210mm';
     element.style.background = 'white';
+    element.style.padding = '0';
+    element.style.margin = '0';
     document.body.appendChild(element);
 
     try {
@@ -305,25 +424,25 @@ export const LocationsPage = () => {
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth - 10;
+      const imgWidth = pdfWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       let heightLeft = imgHeight;
-      let position = 5;
+      let position = 0;
 
       // Добавляем изображение на первую страницу
-      pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight - 10;
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
 
       // Добавляем дополнительные страницы если нужно
       while (heightLeft >= 0) {
-        position = heightLeft - imgHeight + 5;
+        position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
       }
 
-      pdf.save(`TTN-${request.requestNumber}.pdf`);
+      pdf.save(`TTN-${docNumber}.pdf`);
     } finally {
       document.body.removeChild(element);
     }
@@ -531,7 +650,7 @@ export const LocationsPage = () => {
     try {
       await apiService.createRequest({
         requestType: formData.requestType,
-        status: 'pending',
+        status: 'черновик',
         warehouseId: formData.fromWarehouseId || selectedWarehouse || 1,
         transferWarehouseId: formData.toWarehouseId,
         products: formData.products,
@@ -1511,11 +1630,13 @@ export const LocationsPage = () => {
                         const isIncoming = selectedWarehouse && transfer.toWarehouseId === selectedWarehouse;
                         
                         const statusColor = {
-                          'pending': '#f39c12',
-                          'approved': '#3498db',
-                          'in_transit': '#9b59b6',
-                          'completed': '#27ae60',
-                          'rejected': '#e74c3c',
+                          'черновик': '#95a5a6',
+                          'на_согласовании': '#f39c12',
+                          'одобрено': '#3498db',
+                          'в_пути': '#9b59b6',
+                          'на_приемке': '#e67e22',
+                          'завершено': '#27ae60',
+                          'отменено': '#e74c3c',
                         }[transfer.status as string] || '#95a5a6';
 
                         return (
@@ -1597,7 +1718,7 @@ export const LocationsPage = () => {
                                     ✎ {transfer.createdByUser.firstName} {transfer.createdByUser.lastName}
                                   </div>
                                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                    {new Date(transfer.startedAt || 0).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                    {transfer.createdAt ? new Date(new Date(transfer.createdAt).getTime() + 3 * 60 * 60 * 1000).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                                   </div>
                                 </div>
                               ) : (
@@ -1617,7 +1738,7 @@ export const LocationsPage = () => {
                                     <span>{transfer.approvedByUser.firstName} {transfer.approvedByUser.lastName}</span>
                                   </div>
                                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                    Одобрил перемещение
+                                    {transfer.approvedAt ? new Date(new Date(transfer.approvedAt).getTime() + 3 * 60 * 60 * 1000).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                                   </div>
                                 </div>
                               ) : (
@@ -1635,7 +1756,7 @@ export const LocationsPage = () => {
                               )}
                             </td>
                             <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-primary)' }}>
-                              {transfer.completedByUser?.firstName ? (
+                              {transfer.status === 'завершено' && transfer.receivedByUser?.firstName ? (
                                 <div style={{
                                   padding: '8px',
                                   backgroundColor: 'rgba(76, 175, 80, 0.15)',
@@ -1644,10 +1765,25 @@ export const LocationsPage = () => {
                                 }}>
                                   <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ fontSize: '14px' }}>✓</span>
-                                    <span>{transfer.completedByUser.firstName} {transfer.completedByUser.lastName}</span>
+                                    <span>{transfer.receivedByUser.firstName} {transfer.receivedByUser.lastName}</span>
                                   </div>
                                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                    Принял перемещение {new Date(transfer.completedAt || 0).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                    {transfer.receivedAt ? new Date(new Date(transfer.receivedAt).getTime() + 3 * 60 * 60 * 1000).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                  </div>
+                                </div>
+                              ) : transfer.status === 'отменено' && transfer.cancelledByUser?.firstName ? (
+                                <div style={{
+                                  padding: '8px',
+                                  backgroundColor: 'rgba(244, 67, 54, 0.15)',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(244, 67, 54, 0.3)',
+                                }}>
+                                  <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', color: '#c62828' }}>
+                                    <span style={{ fontSize: '14px' }}>✕</span>
+                                    <span>Отклонено: {transfer.cancelledByUser.firstName} {transfer.cancelledByUser.lastName}</span>
+                                  </div>
+                                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                    {transfer.cancelledAt ? new Date(new Date(transfer.cancelledAt).getTime() + 3 * 60 * 60 * 1000).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                                   </div>
                                 </div>
                               ) : (
@@ -1660,7 +1796,7 @@ export const LocationsPage = () => {
                                   fontWeight: '600',
                                   fontSize: '12px',
                                 }}>
-                                  — Не принято
+                                  — Не обработано
                                 </div>
                               )}
                             </td>
@@ -1676,11 +1812,13 @@ export const LocationsPage = () => {
                                   fontWeight: 'bold',
                                 }}
                               >
-                                {transfer.status === 'pending' ? 'Ожидание' : 
-                                 transfer.status === 'approved' ? 'Одобрено' : 
-                                 transfer.status === 'in_transit' ? 'В пути' : 
-                                 transfer.status === 'completed' ? 'Завершено' : 
-                                 transfer.status === 'rejected' ? 'Отклонено' : transfer.status}
+                                {transfer.status === 'черновик' ? 'Черновик' : 
+                                 transfer.status === 'на_согласовании' ? 'На согласовании' : 
+                                 transfer.status === 'одобрено' ? 'Одобрено' : 
+                                 transfer.status === 'в_пути' ? 'В пути' :
+                                 transfer.status === 'на_приемке' ? 'На приемке' :
+                                 transfer.status === 'завершено' ? 'Завершено' : 
+                                 transfer.status === 'отменено' ? 'Отменено' : transfer.status}
                               </span>
                             </td>
                             <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -1715,16 +1853,16 @@ export const LocationsPage = () => {
                                 >
                                   📄
                                 </button>
-                                {transfer.status === 'pending' && (
+                                {transfer.status === 'черновик' && (
                                   <>
                                     <button
                                       onClick={async () => {
-                                        await apiService.updateRequestStatus(String(transfer.id), 'approved', user?.id ? parseInt(String(user.id)) : 0);
+                                        await apiService.updateRequestStatus(String(transfer.id), 'на_согласовании', user?.id ? parseInt(String(user.id)) : 0);
                                         const updatedRequests = await apiService.getRequests();
                                         loadTransfers(updatedRequests);
-                                        showSuccess('Заявка одобрена!');
+                                        showSuccess('На согласовании!');
                                       }}
-                                      title="Одобрить"
+                                      title="Отправить на согласование"
                                       style={{
                                         padding: '6px 10px',
                                         fontSize: '12px',
@@ -1742,16 +1880,47 @@ export const LocationsPage = () => {
                                         (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#3498db';
                                       }}
                                     >
+                                      →
+                                    </button>
+                                  </>
+                                )}
+                                {transfer.status === 'на_согласовании' && (
+                                  <>
+                                    <button
+                                      onClick={async () => {
+                                        await apiService.updateRequestStatus(String(transfer.id), 'одобрено', user?.id ? parseInt(String(user.id)) : 0);
+                                        const updatedRequests = await apiService.getRequests();
+                                        loadTransfers(updatedRequests);
+                                        showSuccess('Одобрено!');
+                                      }}
+                                      title="Одобрить"
+                                      style={{
+                                        padding: '6px 10px',
+                                        fontSize: '12px',
+                                        backgroundColor: '#27ae60',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#229954';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#27ae60';
+                                      }}
+                                    >
                                       ✓
                                     </button>
                                     <button
                                       onClick={async () => {
-                                        await apiService.updateRequestStatus(String(transfer.id), 'rejected', user?.id ? parseInt(String(user.id)) : 0);
+                                        await apiService.updateRequestStatus(String(transfer.id), 'отменено', user?.id ? parseInt(String(user.id)) : 0);
                                         const updatedRequests = await apiService.getRequests();
                                         loadTransfers(updatedRequests);
-                                        showSuccess('Заявка отклонена!');
+                                        showSuccess('Отменено!');
                                       }}
-                                      title="Отклонить"
+                                      title="Отменить"
                                       style={{
                                         padding: '6px 10px',
                                         fontSize: '12px',
@@ -1773,13 +1942,13 @@ export const LocationsPage = () => {
                                     </button>
                                   </>
                                 )}
-                                {transfer.status === 'approved' && (
+                                {transfer.status === 'одобрено' && (
                                   <button
                                     onClick={async () => {
-                                      await apiService.updateRequestStatus(String(transfer.id), 'in_transit', user?.id ? parseInt(String(user.id)) : 0);
+                                      await apiService.updateRequestStatus(String(transfer.id), 'в_пути', user?.id ? parseInt(String(user.id)) : 0);
                                       const updatedRequests = await apiService.getRequests();
                                       loadTransfers(updatedRequests);
-                                      showSuccess('Перемещение отправлено!');
+                                      showSuccess('В пути!');
                                     }}
                                     title="Отправить в путь"
                                     style={{
@@ -1799,18 +1968,47 @@ export const LocationsPage = () => {
                                       (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#9b59b6';
                                     }}
                                   >
-                                    📤
+                                    →
                                   </button>
                                 )}
-                                {transfer.status === 'in_transit' && (
+                                {transfer.status === 'в_пути' && (
                                   <button
                                     onClick={async () => {
-                                      await apiService.updateRequestStatus(String(transfer.id), 'completed', user?.id ? parseInt(String(user.id)) : 0);
+                                      await apiService.updateRequestStatus(String(transfer.id), 'на_приемке', user?.id ? parseInt(String(user.id)) : 0);
                                       const updatedRequests = await apiService.getRequests();
                                       loadTransfers(updatedRequests);
-                                      showSuccess('Перемещение завершено!');
+                                      showSuccess('На приемке!');
                                     }}
-                                    title="Завершить"
+                                    title="Товары поступили"
+                                    style={{
+                                      padding: '6px 10px',
+                                      fontSize: '12px',
+                                      backgroundColor: '#e67e22',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#d35400';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#e67e22';
+                                    }}
+                                  >
+                                    ↓
+                                  </button>
+                                )}
+                                {transfer.status === 'на_приемке' && (
+                                  <button
+                                    onClick={async () => {
+                                      await apiService.updateRequestStatus(String(transfer.id), 'завершено', user?.id ? parseInt(String(user.id)) : 0);
+                                      const updatedRequests = await apiService.getRequests();
+                                      loadTransfers(updatedRequests);
+                                      showSuccess('Завершено!');
+                                    }}
+                                    title="Приемка завершена"
                                     style={{
                                       padding: '6px 10px',
                                       fontSize: '12px',
@@ -1829,35 +2027,6 @@ export const LocationsPage = () => {
                                     }}
                                   >
                                     ✓
-                                  </button>
-                                )}
-                                {transfer.status === 'rejected' && (
-                                  <button
-                                    onClick={async () => {
-                                      await apiService.updateRequestStatus(String(transfer.id), 'pending', user?.id ? parseInt(String(user.id)) : 0);
-                                      const updatedRequests = await apiService.getRequests();
-                                      loadTransfers(updatedRequests);
-                                      showSuccess('Заявка восстановлена!');
-                                    }}
-                                    title="Вернуть на рассмотрение"
-                                    style={{
-                                      padding: '6px 10px',
-                                      fontSize: '12px',
-                                      backgroundColor: '#f39c12',
-                                      color: 'white',
-                                      border: 'none',
-                                      borderRadius: '4px',
-                                      cursor: 'pointer',
-                                      transition: 'background-color 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#e67e22';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f39c12';
-                                    }}
-                                  >
-                                    ↻
                                   </button>
                                 )}
                               </div>
