@@ -1,4 +1,3 @@
-using log4net;
 using Microsoft.EntityFrameworkCore;
 using WarehouseAPI.Data;
 using WarehouseAPI.Models;
@@ -18,11 +17,12 @@ public interface IAuditService
 public class AuditService : IAuditService
 {
     private readonly WarehouseContext _context;
-    private static readonly ILog _logger = LogManager.GetLogger(typeof(AuditService));
+    private readonly ILogger<AuditService> _logger;
 
-    public AuditService(WarehouseContext context)
+    public AuditService(WarehouseContext context, ILogger<AuditService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task LogActionAsync(
@@ -68,7 +68,7 @@ public class AuditService : IAuditService
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error logging audit: {ex.Message}", ex);
+            _logger.LogError(ex, "Error logging audit: {Message}", ex.Message);
         }
     }
 
@@ -101,7 +101,7 @@ public class AuditService : IAuditService
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error retrieving user logs: {ex.Message}", ex);
+            _logger.LogError(ex, "Error retrieving user logs: {Message}", ex.Message);
             return new List<AuditLog>();
         }
     }
@@ -129,7 +129,7 @@ public class AuditService : IAuditService
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error retrieving all logs: {ex.Message}", ex);
+            _logger.LogError(ex, "Error retrieving all logs: {Message}", ex.Message);
             return new List<AuditLog>();
         }
     }
@@ -141,16 +141,16 @@ public class AuditService : IAuditService
         switch (logLevel.ToUpper())
         {
             case "ERROR":
-                _logger.Error(message);
+                _logger.LogError(message);
                 break;
             case "WARNING":
-                _logger.Warn(message);
+                _logger.LogWarning(message);
                 break;
             case "DEBUG":
-                _logger.Debug(message);
+                _logger.LogDebug(message);
                 break;
             default:
-                _logger.Info(message);
+                _logger.LogInformation(message);
                 break;
         }
     }

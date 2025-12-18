@@ -178,6 +178,10 @@ public class RequestsController : ControllerBase
         [FromBody] UpdateRequestStatusDto statusUpdate,
         [FromQuery] int loggedInUserId)
     {
+        // Validate that status is provided
+        if (string.IsNullOrEmpty(statusUpdate?.Status))
+            return BadRequest("Статус (status) обязателен");
+        
         var request = await _context.Requests
             .Include(r => r.RequestProducts)
             .ThenInclude(rp => rp.Product)
@@ -193,18 +197,18 @@ public class RequestsController : ControllerBase
         var oldStatus = request.Status;
 
         // Проверяем права доступа в зависимости от статуса и роли
-        bool canChangeStatus = CheckPermissionsForStatusChange(user, request, statusUpdate.NewStatus);
+        bool canChangeStatus = CheckPermissionsForStatusChange(user, request, statusUpdate.Status);
         if (!canChangeStatus)
         {
-            var errorMsg = $"У вас нет прав для изменения статуса на '{statusUpdate.NewStatus}'. Текущий статус: {request.Status}, роль: {user.Role}, склад пользователя: {user.WarehouseId}, склад отправления: {request.WarehouseId}, склад получения: {request.TransferWarehouseId}";
+            var errorMsg = $"У вас нет прав для изменения статуса на '{statusUpdate.Status}'. Текущий статус: {request.Status}, роль: {user.Role}, склад пользователя: {user.WarehouseId}, склад отправления: {request.WarehouseId}, склад получения: {request.TransferWarehouseId}";
             Console.WriteLine($"ERROR: {errorMsg}");
             return BadRequest(errorMsg);
         }
 
         // Проверяем валидность перехода статуса
-        if (!IsValidStatusTransition(request.Status, statusUpdate.NewStatus))
+        if (!IsValidStatusTransition(request.Status, statusUpdate.Status))
         {
-            var errorMsg = $"Невозможно изменить статус с '{request.Status}' на '{statusUpdate.NewStatus}'";
+            var errorMsg = $"Невозможно изменить статус с '{request.Status}' на '{statusUpdate.Status}'";
             Console.WriteLine($"ERROR: {errorMsg}");
             return BadRequest(errorMsg);
         }
@@ -212,7 +216,7 @@ public class RequestsController : ControllerBase
         // Выполняем действия согласно новому статусу
         try
         {
-            switch (statusUpdate.NewStatus)
+            switch (statusUpdate.Status)
             {
                 case "на_согласовании":
                     // Переход на согласование (только из черновика)
@@ -261,7 +265,7 @@ public class RequestsController : ControllerBase
                     break;
             }
 
-            request.Status = statusUpdate.NewStatus;
+            request.Status = statusUpdate.Status;
             request.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
@@ -278,7 +282,7 @@ public class RequestsController : ControllerBase
                 id,
                 user.Id,
                 request.WarehouseId,
-                description: $"Статус заявки изменен с '{oldStatus}' на '{statusUpdate.NewStatus}' пользователем {user.Username}",
+                description: $"Статус заявки изменен с '{oldStatus}' на '{statusUpdate.Status}' пользователем {user.Username}",
                 logLevel: "INFO"
             );
 

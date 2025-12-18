@@ -197,6 +197,31 @@ public class WarehouseContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull)
                 .IsRequired(false);
 
+            // Связи с User для разных ролей утверждения
+            entity.HasOne(e => e.ApprovedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.ApprovedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            entity.HasOne(e => e.ReceivedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.ReceivedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            entity.HasOne(e => e.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CompletedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            entity.HasOne(e => e.CancelledByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CancelledBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
             entity.HasMany(e => e.RequestProducts)
                 .WithOne(rp => rp.Request)
                 .HasForeignKey(rp => rp.RequestId)
@@ -299,6 +324,70 @@ public class WarehouseContext : DbContext
             new Category { Id = 1, Name = "Материалы", Description = "Строительные материалы" },
             new Category { Id = 2, Name = "Инструменты", Description = "Инструменты и оборудование" },
             new Category { Id = 3, Name = "Прочее", Description = "Прочие товары" }
+        );
+
+        // Seed Test Users
+        modelBuilder.Entity<User>().HasData(
+            new User 
+            { 
+                Id = 1, 
+                Username = "admin", 
+                Email = "admin@warehouse.com",
+                PasswordHash = "password123",  // Plain text for testing - use proper hashing in production!
+                Role = "Admin",
+                WarehouseId = 1,
+                IsActive = true,
+                IsOnline = false,
+                FirstName = "Админ",
+                LastName = "Системы",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new User 
+            { 
+                Id = 2, 
+                Username = "manager", 
+                Email = "manager@warehouse.com",
+                PasswordHash = "password123",
+                Role = "Manager",
+                WarehouseId = 1,
+                IsActive = true,
+                IsOnline = false,
+                FirstName = "Менеджер",
+                LastName = "Склада",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new User 
+            { 
+                Id = 3, 
+                Username = "warehouse1", 
+                Email = "warehouse1@warehouse.com",
+                PasswordHash = "password123",
+                Role = "Warehouseman",
+                WarehouseId = 1,
+                IsActive = true,
+                IsOnline = false,
+                FirstName = "Кладовщик",
+                LastName = "Первый",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new User 
+            { 
+                Id = 4, 
+                Username = "viewer", 
+                Email = "viewer@warehouse.com",
+                PasswordHash = "password123",
+                Role = "Viewer",
+                WarehouseId = 1,
+                IsActive = true,
+                IsOnline = false,
+                FirstName = "Просмотр",
+                LastName = "Данных",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }
         );
     }
 }

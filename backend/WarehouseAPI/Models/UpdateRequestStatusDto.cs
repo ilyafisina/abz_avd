@@ -4,11 +4,20 @@ namespace WarehouseAPI.Models;
 
 public class UpdateRequestStatusDto
 {
-    [JsonPropertyName("newStatus")]
-    public required string NewStatus { get; set; }
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
     
-    [JsonPropertyName("notes")]
-    public string? Notes { get; set; }
+    // Backward compatibility: support old "newStatus" field name
+    [JsonPropertyName("newStatus")]
+    public string? NewStatus
+    {
+        get => Status;
+        set
+        {
+            if (!string.IsNullOrEmpty(value))
+                Status = value;
+        }
+    }
     
     [JsonPropertyName("reason")]
     public string? Reason { get; set; } // Причина отмены/отклонения
